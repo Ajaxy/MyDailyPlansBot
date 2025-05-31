@@ -11,7 +11,10 @@ if (result.error) {
 }
 
 // Validate required environment variables
-const requiredEnvVars: string[] = [];
+const requiredEnvVars = [
+  'TELEGRAM_BOT_TOKEN',
+  'TRACKED_USER_IDS',
+];
 
 const missingRequiredEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 if (missingRequiredEnvVars.length) {
@@ -24,7 +27,10 @@ export const env = {
     interval: parseInt(process.env.WORKER_INTERVAL || '5000', 10),
   },
   telegram: {
-    // botToken: process.env.TELEGRAM_BOT_TOKEN,
+    botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    trackedUserIds: process.env.TRACKED_USER_IDS
+      ? process.env.TRACKED_USER_IDS.split(',').map(id => parseInt(id.trim(), 10))
+      : [],
   },
 };
 
