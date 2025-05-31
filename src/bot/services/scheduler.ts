@@ -46,13 +46,13 @@ export class SchedulerService {
     return now.toISOString().split('T')[0]; // YYYY-MM-DD format
   }
 
-  private async sendInitialReminder(): Promise<void> {
+  public async sendInitialReminder(): Promise<void> {
     const date = this.getCurrentDate();
-    
+
     for (const chatId of this.activeChats) {
       try {
         const state = this.stateManager.getState(chatId, date);
-        
+
         // Reset state for new day if it's the first reminder
         if (state.reminderCount === 0) {
           this.stateManager.resetStateForDate(chatId, date);
@@ -61,7 +61,7 @@ export class SchedulerService {
         const message = this.getInitialReminderMessage();
         await this.bot.api.sendMessage(chatId, message);
         this.stateManager.incrementReminderCount(chatId, date);
-        
+
         console.log(`Sent initial reminder to chat ${chatId} for date ${date}`);
       } catch (error) {
         console.error(`Error sending initial reminder to chat ${chatId}:`, error);
@@ -69,20 +69,20 @@ export class SchedulerService {
     }
   }
 
-  private async sendFollowUpReminder(): Promise<void> {
+  public async sendFollowUpReminder(): Promise<void> {
     const date = this.getCurrentDate();
-    
+
     for (const chatId of this.activeChats) {
       try {
         const state = this.stateManager.getState(chatId, date);
-        
+
         // Only send follow-up if we haven't exceeded the limit (4 total reminders)
         if (state.reminderCount >= 4) {
           continue;
         }
 
         const unrepliedUsers = this.stateManager.getUnrepliedUsers(chatId, date, this.trackedUserIds);
-        
+
         // Skip if everyone has replied
         if (unrepliedUsers.length === 0) {
           continue;
@@ -91,7 +91,7 @@ export class SchedulerService {
         const message = await this.getFollowUpReminderMessage(chatId, unrepliedUsers);
         await this.bot.api.sendMessage(chatId, message);
         this.stateManager.incrementReminderCount(chatId, date);
-        
+
         console.log(`Sent follow-up reminder to chat ${chatId} for date ${date}, ${unrepliedUsers.length} users pending`);
       } catch (error) {
         console.error(`Error sending follow-up reminder to chat ${chatId}:`, error);
@@ -105,12 +105,12 @@ export class SchedulerService {
 
   private async getFollowUpReminderMessage(chatId: number, unrepliedUserIds: number[]): Promise<string> {
     const mentions: string[] = [];
-    
+
     for (const userId of unrepliedUserIds) {
       try {
         const chatMember = await this.bot.api.getChatMember(chatId, userId);
         const user = chatMember.user;
-        
+
         if (user.username) {
           mentions.push(`@${user.username}`);
         } else {
@@ -130,4 +130,4 @@ export class SchedulerService {
   public getActiveChats(): Set<number> {
     return new Set(this.activeChats);
   }
-} 
+}

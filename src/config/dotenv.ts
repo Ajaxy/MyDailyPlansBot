@@ -14,6 +14,7 @@ if (result.error) {
 const requiredEnvVars = [
   'TELEGRAM_BOT_TOKEN',
   'TRACKED_USER_IDS',
+  'ACTIVE_CHAT_IDS',
 ];
 
 const missingRequiredEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
@@ -30,6 +31,9 @@ export const env = {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
     trackedUserIds: process.env.TRACKED_USER_IDS
       ? process.env.TRACKED_USER_IDS.split(',').map(id => parseInt(id.trim(), 10))
+      : [],
+    activeChatIds: process.env.ACTIVE_CHAT_IDS
+      ? process.env.ACTIVE_CHAT_IDS.split(',').map(id => parseInt(id.trim(), 10))
       : [],
   },
 };

@@ -9,6 +9,7 @@ export interface DailyPlanState {
 export interface BotConfig {
   token: string;
   trackedUserIds: number[];
+  activeChatIds: number[];
 }
 
 export interface ReminderTimes {
