@@ -1,10 +1,7 @@
-import { initializeDatabase } from '../config/database';
 import { PROJECT_NAME } from '../config';
 
 (async () => {
   try {
-    await initializeDatabase();
-
     // Handle graceful shutdown
     process.on('SIGINT', () => {
       console.log(`${PROJECT_NAME} Worker service shutting down...`);
