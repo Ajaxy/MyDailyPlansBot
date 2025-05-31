@@ -100,7 +100,7 @@ export class SchedulerService {
   }
 
   private getInitialReminderMessage(): string {
-    return '🌅 Good morning, team! Please share your daily plans for today.';
+    return '🌅 Всем доброе утро! Пожалуйста, поделитесь своими планами на день.';
   }
 
   private async getFollowUpReminderMessage(chatId: number, unrepliedUserIds: number[]): Promise<string> {
@@ -119,12 +119,12 @@ export class SchedulerService {
         }
       } catch (error) {
         console.warn(`Could not get user info for ${userId}:`, error);
-        mentions.push(`[User ${userId}](tg://user?id=${userId})`);
+        mentions.push(`[Пользователь ${userId}](tg://user?id=${userId})`);
       }
     }
 
     const mentionText = mentions.join(', ');
-    return `⏰ Friendly reminder: ${mentionText}, please don't forget to share your daily plans!`;
+    return `⏰ Дружеское напоминание: ${mentionText}, пожалуйста, не забудьте поделиться своими планами на день!`;
   }
 
   public getActiveChats(): Set<number> {
