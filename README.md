@@ -59,10 +59,11 @@ To find Telegram user IDs for the `TRACKED_USER_IDS` configuration:
 
 ```bash
 # Development mode with auto-restart and manual reminder triggers
-npm run dev:worker
+npm run dev
 
 # Production mode
-npm run start:worker
+npm run build
+npm run start
 ```
 
 **Development Mode Features:**
