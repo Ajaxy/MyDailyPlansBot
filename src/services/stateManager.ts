@@ -13,7 +13,7 @@ export class StateManager {
       this.states.set(key, {
         chatId,
         date,
-        repliedUsers: new Set(),
+        repliedUserIds: new Set(),
         reminderCount: 0,
       });
     }
@@ -22,7 +22,7 @@ export class StateManager {
 
   public markUserReplied(chatId: number, date: string, userId: number): void {
     const state = this.getState(chatId, date);
-    state.repliedUsers.add(userId);
+    state.repliedUserIds.add(userId);
   }
 
   public incrementReminderCount(chatId: number, date: string): void {
@@ -31,21 +31,21 @@ export class StateManager {
     state.lastReminderTime = new Date();
   }
 
-  public getRepliedUsers(chatId: number, date: string): Set<number> {
-    return this.getState(chatId, date).repliedUsers;
+  public getRepliedUserIds(chatId: number, date: string): Set<number> {
+    return this.getState(chatId, date).repliedUserIds;
   }
 
   public getReminderCount(chatId: number, date: string): number {
     return this.getState(chatId, date).reminderCount;
   }
 
-  public getUnrepliedUsers(chatId: number, date: string, trackedUserIds: number[]): number[] {
-    const repliedUsers = this.getRepliedUsers(chatId, date);
-    return trackedUserIds.filter(userId => !repliedUsers.has(userId));
+  public getUnrepliedUserIds(chatId: number, date: string, trackedUserIds: number[]): number[] {
+    const repliedUserIds = this.getRepliedUserIds(chatId, date);
+    return trackedUserIds.filter(userId => !repliedUserIds.has(userId));
   }
 
   public hasUserReplied(chatId: number, date: string, userId: number): boolean {
-    return this.getRepliedUsers(chatId, date).has(userId);
+    return this.getRepliedUserIds(chatId, date).has(userId);
   }
 
   public resetStateForDate(chatId: number, date: string): void {

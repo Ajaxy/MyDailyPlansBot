@@ -1,14 +1,18 @@
+import 'reflect-metadata'; // Required for TypeORM
 import { PROJECT_NAME } from '../config';
 import { env } from '../config/dotenv';
-import { BotService } from '../bot';
+import { initializeDatabase } from '../config/database';
+import { BotService } from '../services';
 
 (async () => {
   try {
+    // Initialize database connection first
+    await initializeDatabase();
+    console.log('Database initialized successfully');
+
     // Initialize the bot
     const botService = new BotService({
       token: env.telegram.botToken,
-      trackedUserIds: env.telegram.trackedUserIds,
-      activeChatIds: env.telegram.activeChatIds,
     });
 
     // In development mode, listen for manual reminder triggers

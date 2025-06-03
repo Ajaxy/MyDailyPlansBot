@@ -10,32 +10,57 @@ if (result.error) {
   console.warn('Warning: .env file not found or cannot be read.');
 }
 
-// Validate required environment variables
-const requiredEnvVars = [
-  'TELEGRAM_BOT_TOKEN',
-  'TRACKED_USER_IDS',
-  'ACTIVE_CHAT_IDS',
-];
+function parseDatabaseUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname,
+      port: parseInt(parsed.port || '5432', 10),
+      username: parsed.username,
+      password: parsed.password,
+      database: parsed.pathname.slice(1),
+    };
+  } catch (error) {
+    throw new Error(`Invalid DATABASE_URL format: ${error}`);
+  }
+}
 
+let databaseConfig;
+
+if (process.env.DATABASE_URL) {
+  databaseConfig = parseDatabaseUrl(process.env.DATABASE_URL);
+} else {
+  const requiredDbEnvVars = ['DB_HOST', 'DB_PORT', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE'];
+  const missingDbEnvVars = requiredDbEnvVars.filter(envVar => !process.env[envVar]);
+  
+  if (missingDbEnvVars.length) {
+    console.error(`Error: Missing database environment variables: ${missingDbEnvVars.join(', ')}`);
+    console.error('Provide either DATABASE_URL or all individual DB_ variables');
+  }
+
+  databaseConfig = {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    username: process.env.DB_USERNAME || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    database: process.env.DB_DATABASE || 'mdp',
+  };
+}
+
+const requiredEnvVars = ['TELEGRAM_BOT_TOKEN'];
 const missingRequiredEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 if (missingRequiredEnvVars.length) {
   console.error(`Error: Missing environment variables: ${missingRequiredEnvVars.join(', ')}`);
 }
 
-// Export for direct access
 export const env = {
   worker: {
     interval: parseInt(process.env.WORKER_INTERVAL || '5000', 10),
   },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
-    trackedUserIds: process.env.TRACKED_USER_IDS
-      ? process.env.TRACKED_USER_IDS.split(',').map(id => parseInt(id.trim(), 10))
-      : [],
-    activeChatIds: process.env.ACTIVE_CHAT_IDS
-      ? process.env.ACTIVE_CHAT_IDS.split(',').map(id => parseInt(id.trim(), 10))
-      : [],
   },
+  database: databaseConfig,
 };
 
 export default env;

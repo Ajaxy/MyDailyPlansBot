@@ -1,24 +1,34 @@
-import { SchedulerService } from '../src/bot/services/scheduler';
-import { StateManager } from '../src/bot/services/stateManager';
+import { SchedulerService } from '../src/services/scheduler';
+import { StateManager } from '../src/services/stateManager';
 
 // Mock node-cron
 jest.mock('node-cron', () => ({
   schedule: jest.fn(),
 }));
 
+// Mock UserService
+jest.mock('../src/services/UserService', () => {
+  return {
+    UserService: jest.fn().mockImplementation(() => ({
+      getActiveChatIds: jest.fn(),
+      getTrackedUserIdsForChat: jest.fn(),
+      getActiveUsersForChat: jest.fn(),
+    })),
+  };
+});
+
 // Mock the grammy Bot class
 const mockBot = {
   api: {
     sendMessage: jest.fn(),
-    getChatMember: jest.fn(),
   },
 };
 
 describe('SchedulerService', () => {
   let scheduler: SchedulerService;
   let stateManager: StateManager;
+  let mockUserService: any;
   let mockSchedule: jest.Mock;
-  const trackedUserIds = [123456789, 987654321];
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -27,42 +37,12 @@ describe('SchedulerService', () => {
     mockSchedule = cron.schedule;
     
     stateManager = new StateManager();
-    scheduler = new SchedulerService(mockBot as any, stateManager, trackedUserIds);
-  });
-
-  describe('initialization', () => {
-    it('should initialize with empty active chats', () => {
-      expect(scheduler.getActiveChats().size).toBe(0);
-    });
-  });
-
-  describe('chat management', () => {
-    it('should add chat to active chats', () => {
-      const chatId = -123456789;
-      scheduler.addChat(chatId);
-      
-      expect(scheduler.getActiveChats().has(chatId)).toBe(true);
-    });
-
-    it('should remove chat from active chats', () => {
-      const chatId = -123456789;
-      scheduler.addChat(chatId);
-      scheduler.removeChat(chatId);
-      
-      expect(scheduler.getActiveChats().has(chatId)).toBe(false);
-    });
-
-    it('should handle multiple chats', () => {
-      const chat1 = -123456789;
-      const chat2 = -987654321;
-      
-      scheduler.addChat(chat1);
-      scheduler.addChat(chat2);
-      
-      expect(scheduler.getActiveChats().size).toBe(2);
-      expect(scheduler.getActiveChats().has(chat1)).toBe(true);
-      expect(scheduler.getActiveChats().has(chat2)).toBe(true);
-    });
+    
+    // Create mock UserService
+    const { UserService } = require('../src/services/UserService');
+    mockUserService = new UserService();
+    
+    scheduler = new SchedulerService(mockBot as any, stateManager, mockUserService);
   });
 
   describe('scheduler start', () => {
@@ -100,7 +80,10 @@ describe('SchedulerService', () => {
 
     it('should send initial reminder to active chats', async () => {
       const chatId = -123456789;
-      scheduler.addChat(chatId);
+      
+      // Mock UserService to return active chats
+      mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
+      
       scheduler.start();
 
       // Get the initial reminder function
@@ -113,7 +96,7 @@ describe('SchedulerService', () => {
 
       expect(mockBot.api.sendMessage).toHaveBeenCalledWith(
         chatId,
-        '🌅 Good morning, team! Please share your daily plans for today.'
+        '🌅 Всем доброе утро! Пожалуйста, поделитесь своими планами на день.'
       );
 
       // Verify reminder count was incremented
@@ -124,8 +107,11 @@ describe('SchedulerService', () => {
     it('should not send follow-up reminder if everyone has replied', async () => {
       const chatId = -123456789;
       const today = '2023-12-15';
+      const trackedUserIds = [123456789, 987654321];
       
-      scheduler.addChat(chatId);
+      // Mock UserService
+      mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
+      mockUserService.getTrackedUserIdsForChat.mockResolvedValue(trackedUserIds);
       
       // Mark all users as replied
       trackedUserIds.forEach(userId => {
@@ -152,22 +138,18 @@ describe('SchedulerService', () => {
     it('should send follow-up reminder with mentions for unreplied users', async () => {
       const chatId = -123456789;
       const today = '2023-12-15';
+      const trackedUserIds = [123456789, 987654321];
       
-      scheduler.addChat(chatId);
+      // Mock UserService
+      mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
+      mockUserService.getTrackedUserIdsForChat.mockResolvedValue(trackedUserIds);
+      mockUserService.getActiveUsersForChat.mockResolvedValue([
+        { telegramId: 987654321, username: 'jane_doe' },
+      ]);
       
       // Mark only one user as replied
       stateManager.markUserReplied(chatId, today, 123456789);
       stateManager.incrementReminderCount(chatId, today); // 1 reminder already sent
-      
-      // Mock getChatMember to return user info
-      mockBot.api.getChatMember.mockResolvedValueOnce({
-        user: {
-          id: 987654321,
-          first_name: 'Jane',
-          last_name: 'Doe',
-          username: 'jane_doe',
-        },
-      });
       
       scheduler.start();
 
@@ -179,35 +161,29 @@ describe('SchedulerService', () => {
 
       await followUpReminderFunc();
 
-      expect(mockBot.api.getChatMember).toHaveBeenCalledWith(chatId, 987654321);
       expect(mockBot.api.sendMessage).toHaveBeenCalledWith(
         chatId,
-        '⏰ Friendly reminder: @jane_doe, please don\'t forget to share your daily plans!'
+        '⏰ Дружеское напоминание: @jane_doe, пожалуйста, не забудьте поделиться своими планами на день!',
+        { parse_mode: 'Markdown' }
       );
 
       // Verify reminder count was incremented
       expect(stateManager.getReminderCount(chatId, today)).toBe(2);
     });
 
-    it('should handle user mention when no username available', async () => {
+    it('should handle user mention when user not found in database', async () => {
       const chatId = -123456789;
       const today = '2023-12-15';
+      const trackedUserIds = [123456789, 987654321];
       
-      scheduler.addChat(chatId);
+      // Mock UserService
+      mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
+      mockUserService.getTrackedUserIdsForChat.mockResolvedValue(trackedUserIds);
+      mockUserService.getActiveUsersForChat.mockResolvedValue([]); // No users found
       
       // Mark only one user as replied
       stateManager.markUserReplied(chatId, today, 123456789);
       stateManager.incrementReminderCount(chatId, today);
-      
-      // Mock getChatMember to return user without username
-      mockBot.api.getChatMember.mockResolvedValueOnce({
-        user: {
-          id: 987654321,
-          first_name: 'Jane',
-          last_name: 'Doe',
-          // no username
-        },
-      });
       
       scheduler.start();
 
@@ -220,15 +196,19 @@ describe('SchedulerService', () => {
 
       expect(mockBot.api.sendMessage).toHaveBeenCalledWith(
         chatId,
-        '⏰ Friendly reminder: [Jane Doe](tg://user?id=987654321), please don\'t forget to share your daily plans!'
+        '⏰ Дружеское напоминание: [Пользователь 987654321](tg://user?id=987654321), пожалуйста, не забудьте поделиться своими планами на день!',
+        { parse_mode: 'Markdown' }
       );
     });
 
     it('should not send more than 4 reminders per day', async () => {
       const chatId = -123456789;
       const today = '2023-12-15';
+      const trackedUserIds = [123456789, 987654321];
       
-      scheduler.addChat(chatId);
+      // Mock UserService
+      mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
+      mockUserService.getTrackedUserIdsForChat.mockResolvedValue(trackedUserIds);
       
       // Set reminder count to maximum
       stateManager.incrementReminderCount(chatId, today);
@@ -251,7 +231,9 @@ describe('SchedulerService', () => {
 
     it('should handle errors gracefully when sending messages', async () => {
       const chatId = -123456789;
-      scheduler.addChat(chatId);
+      
+      // Mock UserService
+      mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
       
       // Mock sendMessage to throw an error
       mockBot.api.sendMessage.mockRejectedValueOnce(new Error('Network error'));
@@ -280,8 +262,8 @@ describe('SchedulerService', () => {
       const chat1 = -123456789;
       const chat2 = -987654321;
       
-      scheduler.addChat(chat1);
-      scheduler.addChat(chat2);
+      // Mock UserService
+      mockUserService.getActiveChatIds.mockResolvedValue([chat1, chat2]);
       
       scheduler.start();
 
@@ -297,19 +279,41 @@ describe('SchedulerService', () => {
       expect(mockBot.api.sendMessage).toHaveBeenCalledWith(chat1, expect.any(String));
       expect(mockBot.api.sendMessage).toHaveBeenCalledWith(chat2, expect.any(String));
     });
+
+    it('should handle UserService errors gracefully', async () => {
+      // Mock UserService to throw an error
+      mockUserService.getActiveChatIds.mockRejectedValue(new Error('Database error'));
+      
+      // Mock console.error to verify error logging
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
+      scheduler.start();
+
+      const initialReminderCall = mockSchedule.mock.calls.find(
+        (call: any[]) => call[0] === '0 6 * * 1-5'
+      );
+      const initialReminderFunc = initialReminderCall![1];
+
+      await initialReminderFunc();
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Error getting active chat IDs:',
+        expect.any(Error)
+      );
+      
+      consoleSpy.mockRestore();
+    });
   });
 
-  describe('getActiveChats', () => {
-    it('should return copy of active chats set', () => {
-      const chatId = -123456789;
-      scheduler.addChat(chatId);
+  describe('getActiveChatIds', () => {
+    it('should return active chat IDs from UserService', async () => {
+      const expectedChatIds = [-123456789, -987654321];
+      mockUserService.getActiveChatIds.mockResolvedValue(expectedChatIds);
       
-      const activeChats = scheduler.getActiveChats();
-      expect(activeChats.has(chatId)).toBe(true);
+      const result = await scheduler.getActiveChatIds();
       
-      // Verify it's a copy
-      activeChats.delete(chatId);
-      expect(scheduler.getActiveChats().has(chatId)).toBe(true);
+      expect(result).toEqual(expectedChatIds);
+      expect(mockUserService.getActiveChatIds).toHaveBeenCalled();
     });
   });
 }); 

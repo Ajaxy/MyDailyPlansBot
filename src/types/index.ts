@@ -1,15 +1,13 @@
 export interface DailyPlanState {
   chatId: number;
   date: string; // YYYY-MM-DD format
-  repliedUsers: Set<number>;
+  repliedUserIds: Set<number>;
   reminderCount: number;
   lastReminderTime?: Date;
 }
 
 export interface BotConfig {
   token: string;
-  trackedUserIds: number[];
-  activeChatIds: number[];
 }
 
 export interface ReminderTimes {

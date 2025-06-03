@@ -1,25 +1,23 @@
 import { Bot, Context, GrammyError, HttpError } from 'grammy';
 import { StateManager } from './stateManager';
 import { SchedulerService } from './scheduler';
+import { UserService } from './UserService';
 import { BotConfig } from '../types';
+import { User } from '../entities';
 
 export class BotService {
   private bot: Bot;
   private stateManager: StateManager;
   private scheduler: SchedulerService;
+  private userService: UserService;
   private config: BotConfig;
 
   constructor(config: BotConfig) {
     this.config = config;
     this.bot = new Bot(config.token);
     this.stateManager = new StateManager();
-    this.scheduler = new SchedulerService(this.bot, this.stateManager, config.trackedUserIds);
-
-    // Initialize scheduler with active chats from config
-    config.activeChatIds.forEach(chatId => {
-      this.scheduler.addChat(chatId);
-      console.log(`Initialized active chat: ${chatId}`);
-    });
+    this.userService = new UserService();
+    this.scheduler = new SchedulerService(this.bot, this.stateManager, this.userService);
 
     this.setupHandlers();
     this.setupErrorHandling();
@@ -36,7 +34,10 @@ export class BotService {
 
         await ctx.reply(
           '👋 Привет! Я бот *MyDailyPlans*, помогаю всем быть в курсе ежедневных планов команды.' +
-          '\n\nБуду напоминать рассказывать о планах на день: в рабочие дни в 6:00 GMT, с несколькими повторениями до 15:00 GMT.',
+          '\n\nБуду напоминать рассказывать о планах на день: в рабочие дни в 6:00 GMT, с несколькими повторениями до 15:00 GMT.' +
+          '\n\n*Команды:*' +
+          '\n/status - Проверить статус ответов' +
+          '\n/help - Показать справку',
           { parse_mode: 'Markdown' }
         );
       } else if (chatMember.new_chat_member.status === 'left' || chatMember.new_chat_member.status === 'kicked') {
@@ -52,34 +53,39 @@ export class BotService {
       }
 
       const chatId = ctx.chat.id;
-      const isActiveChat = this.config.activeChatIds.includes(chatId);
 
-      if (!isActiveChat) {
-        await ctx.reply(
-          '⚠️ Этот чат не настроен для получения напоминаний.\n\n' +
-          `ID чата: \`${chatId}\`\n` +
-          'Добавьте этот ID в переменную окружения ACTIVE_CHAT_IDS, чтобы включить напоминания.',
-          { parse_mode: 'Markdown' }
-        );
-        return;
+      try {
+        const trackedUsers = await this.userService.getActiveUsersForChat(chatId);
+
+        if (trackedUsers.length === 0) {
+          await ctx.reply(
+            '⚠️ В этом чате нет отслеживаемых пользователей.\n\n' +
+            'Обратитесь к администратору для настройки отслеживания участников команды.'
+          );
+          return;
+        }
+
+        const date = this.getCurrentDate();
+        const repliedUserIds = this.stateManager.getRepliedUserIds(chatId, date);
+        const trackedUserIds = trackedUsers.map((u: User) => u.telegramId);
+        const unrepliedUserIds = this.stateManager.getUnrepliedUserIds(chatId, date, trackedUserIds);
+        const reminderCount = this.stateManager.getReminderCount(chatId, date);
+
+        let statusMessage = `📊 Статус ежедневных планов на ${date}:`;
+        statusMessage += `\n\n⏰ Отправлено напоминаний: ${reminderCount}/4`;
+        statusMessage += `\n✅ Ответили: ${repliedUserIds.size}/${trackedUsers.length}`;
+
+        if (unrepliedUserIds.length > 0) {
+          statusMessage += `\n⏳ Ожидаем ответов: ${unrepliedUserIds.length}`;
+        } else {
+          statusMessage += '\n🎉 Все участники команды ответили!';
+        }
+
+        await ctx.reply(statusMessage, { parse_mode: 'Markdown' });
+      } catch (error) {
+        console.error('Error getting status:', error);
+        await ctx.reply('❌ Ошибка при получении статуса.');
       }
-
-      const date = this.getCurrentDate();
-      const repliedUsers = this.stateManager.getRepliedUsers(chatId, date);
-      const unrepliedUsers = this.stateManager.getUnrepliedUsers(chatId, date, this.config.trackedUserIds);
-      const reminderCount = this.stateManager.getReminderCount(chatId, date);
-
-      let statusMessage = `📊 Статус ежедневных планов на ${date}:`;
-      statusMessage += `\n\n⏰ Отправлено напоминаний: ${reminderCount}/4`;
-      statusMessage += `\n✅ Ответили: ${repliedUsers.size}/${this.config.trackedUserIds.length}`;
-
-      if (unrepliedUsers.length > 0) {
-        statusMessage += `\n⏳ Ожидаем ответов: ${unrepliedUsers.length}`;
-      } else {
-        statusMessage += '\n🎉 Все участники команды ответили!';
-      }
-
-      await ctx.reply(statusMessage, { parse_mode: 'Markdown' });
     });
 
     // Handle /help command
@@ -95,13 +101,12 @@ export class BotService {
 • Я отслеживаю ответы только от настроенных участников команды.
 
 *Команды:*
-/status - Проверить, кто ответил сегодня.
-/help - Показать эту справку.
+/status - Проверить, кто ответил сегодня
+/help - Показать эту справку
 
 *Настройка:*
 • Добавьте этого бота в ваш групповой чат.
-• Добавьте ID чата в переменную окружения \`ACTIVE_CHAT_IDS\`.
-• Добавьте ID участников команды в \`TRACKED_USER_IDS\`.
+• Обратитесь к администратору для настройки отслеживания участников.
       `;
 
       await ctx.reply(helpMessage, { parse_mode: 'Markdown' });
@@ -111,26 +116,38 @@ export class BotService {
     this.bot.on('message:text', async (ctx) => {
       const userId = ctx.from?.id;
       const chatId = ctx.chat.id;
+      const username = ctx.from?.username;
 
-      // Only track replies from specified users in configured group chats
-      if (userId &&
-          this.config.trackedUserIds.includes(userId) &&
-          this.config.activeChatIds.includes(chatId) &&
-          ctx.chat.type !== 'private') {
+      if (!userId || !username) return;
 
-        const date = this.getCurrentDate();
+      try {
+        // Check if this is a tracked user in this chat
+        const isTracked = await this.userService.isUserActiveInChat(userId, chatId);
 
-        // Mark user as replied if they haven't already
-        if (!this.stateManager.hasUserReplied(chatId, date, userId)) {
-          this.stateManager.markUserReplied(chatId, date, userId);
-          console.log(`User ${userId} replied with daily plan in chat ${chatId} for date ${date}`);
+        if (isTracked) {
+          await this.userService.upsertUser(userId, chatId, username);
+        }
 
-          // Check if everyone has replied
-          const unrepliedUsers = this.stateManager.getUnrepliedUsers(chatId, date, this.config.trackedUserIds);
-          if (unrepliedUsers.length === 0) {
-            await ctx.reply('✅ Отлично! Все поделились своими планами на день.');
+        // Only track replies from specified users in group chats
+        if (isTracked && ctx.chat.type !== 'private') {
+          const date = this.getCurrentDate();
+
+          // Mark user as replied if they haven't already
+          if (!this.stateManager.hasUserReplied(chatId, date, userId)) {
+            this.stateManager.markUserReplied(chatId, date, userId);
+            console.log(`User ${userId} replied with daily plan in chat ${chatId} for date ${date}`);
+
+            // Check if everyone has replied
+            const trackedUserIds = await this.userService.getTrackedUserIdsForChat(chatId);
+            const unrepliedUserIds = this.stateManager.getUnrepliedUserIds(chatId, date, trackedUserIds);
+
+            if (unrepliedUserIds.length === 0) {
+              await ctx.reply('✅ Отлично! Все поделились своими планами на день.');
+            }
           }
         }
+      } catch (error) {
+        console.error('Error handling message:', error);
       }
     });
   }
@@ -157,8 +174,13 @@ export class BotService {
 
   public async start(): Promise<void> {
     console.log('Starting MyDailyPlans bot...');
-    console.log(`Active chats configured: ${this.config.activeChatIds.join(', ')}`);
-    console.log(`Tracked users configured: ${this.config.trackedUserIds.join(', ')}`);
+
+    try {
+      const activeChatIds = await this.userService.getActiveChatIds();
+      console.log(`Active chats configured: ${activeChatIds.join(', ')}`);
+    } catch (error) {
+      console.log('No active chats found in database');
+    }
 
     // Start the scheduler
     this.scheduler.start();
@@ -185,6 +207,10 @@ export class BotService {
 
   public getScheduler(): SchedulerService {
     return this.scheduler;
+  }
+
+  public getUserService(): UserService {
+    return this.userService;
   }
 
   // For manual reminder triggering in development

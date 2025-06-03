@@ -1,572 +1,412 @@
-import { BotService } from '../src/bot/services/botService';
-import { MockUpdate } from '../src/bot/types';
+import { BotService } from '../src/services/botService';
+import { StateManager } from '../src/services/stateManager';
+import { MockUpdate } from '../src/types';
 
-// Mock the grammy Bot class
-jest.mock('grammy', () => {
-  const mockBot = {
-    api: {
-      sendMessage: jest.fn(),
-      getChatMember: jest.fn(),
-    },
-    on: jest.fn(),
-    command: jest.fn(),
-    catch: jest.fn(),
-    start: jest.fn(),
-    stop: jest.fn(),
-    handleUpdate: jest.fn(),
-  };
+// Mock the Bot
+const mockBot = {
+  api: {
+    sendMessage: jest.fn(),
+  },
+  command: jest.fn(),
+  on: jest.fn(),
+  catch: jest.fn(),
+  start: jest.fn(),
+  stop: jest.fn(),
+};
 
+// Mock grammy
+jest.mock('grammy', () => ({
+  Bot: jest.fn(() => mockBot),
+  GrammyError: class GrammyError extends Error {
+    constructor(public description: string) {
+      super(description);
+    }
+  },
+  HttpError: class HttpError extends Error {
+    constructor(message: string) {
+      super(message);
+    }
+  },
+}));
+
+// Mock UserService
+const mockUserService = {
+  getActiveUsersForChat: jest.fn(),
+  getActiveChatIds: jest.fn(),
+  getTrackedUserIdsForChat: jest.fn(),
+  isUserActiveInChat: jest.fn(),
+  upsertUser: jest.fn(),
+};
+
+jest.mock('../src/services/UserService', () => {
   return {
-    Bot: jest.fn(() => mockBot),
-    GrammyError: class GrammyError extends Error {},
-    HttpError: class HttpError extends Error {},
+    UserService: jest.fn().mockImplementation(() => mockUserService),
   };
 });
 
-// Mock node-cron
-jest.mock('node-cron', () => ({
-  schedule: jest.fn(),
+// Mock SchedulerService
+const mockScheduler = {
+  start: jest.fn(),
+  sendInitialReminder: jest.fn(),
+  sendFollowUpReminder: jest.fn(),
+};
+
+jest.mock('../src/services/scheduler', () => ({
+  SchedulerService: jest.fn().mockImplementation(() => mockScheduler),
 }));
 
 describe('BotService', () => {
   let botService: BotService;
-  let mockBotInstance: any;
-  const config = {
-    token: 'test_token',
-    trackedUserIds: [123456789, 987654321],
-    activeChatIds: [-123456789, -987654321],
-  };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
-    // Get the mocked Bot constructor
-    const { Bot } = require('grammy');
-    botService = new BotService(config);
-    
-    // Get the mock instance
-    mockBotInstance = Bot.mock.results[Bot.mock.results.length - 1].value;
+    botService = new BotService({ token: 'test-token' });
   });
 
-  describe('initialization', () => {
-    it('should create bot with correct token', () => {
-      const { Bot } = require('grammy');
-      expect(Bot).toHaveBeenCalledWith('test_token');
+  describe('constructor', () => {
+    it('should initialize bot service with required components', () => {
+      expect(botService).toBeDefined();
+      expect(botService.getBot()).toBe(mockBot);
+      expect(botService.getStateManager()).toBeInstanceOf(StateManager);
+      expect(botService.getScheduler()).toBeDefined();
+      expect(botService.getUserService()).toBeDefined();
     });
 
-    it('should set up event handlers', () => {
-      expect(mockBotInstance.on).toHaveBeenCalledWith('my_chat_member', expect.any(Function));
-      expect(mockBotInstance.on).toHaveBeenCalledWith('message:text', expect.any(Function));
-      expect(mockBotInstance.command).toHaveBeenCalledWith('status', expect.any(Function));
-      expect(mockBotInstance.command).toHaveBeenCalledWith('help', expect.any(Function));
-      expect(mockBotInstance.catch).toHaveBeenCalledWith(expect.any(Function));
+    it('should set up handlers and error handling', () => {
+      expect(mockBot.on).toHaveBeenCalledWith('my_chat_member', expect.any(Function));
+      expect(mockBot.on).toHaveBeenCalledWith('message:text', expect.any(Function));
+      expect(mockBot.command).toHaveBeenCalledWith('status', expect.any(Function));
+      expect(mockBot.command).toHaveBeenCalledWith('help', expect.any(Function));
+      expect(mockBot.catch).toHaveBeenCalledWith(expect.any(Function));
     });
+  });
 
-    it('should initialize scheduler with active chats from config', () => {
-      const scheduler = botService.getScheduler();
-      const activeChats = scheduler.getActiveChats();
+  describe('start method', () => {
+    it('should start scheduler and bot', async () => {
+      mockUserService.getActiveChatIds.mockResolvedValue([-123456789, -987654321]);
       
-      expect(activeChats.has(-123456789)).toBe(true);
-      expect(activeChats.has(-987654321)).toBe(true);
-      expect(activeChats.size).toBe(2);
+      await botService.start();
+      
+      expect(mockScheduler.start).toHaveBeenCalled();
+      expect(mockBot.start).toHaveBeenCalled();
+    });
+
+    it('should handle case when no active chats found', async () => {
+      mockUserService.getActiveChatIds.mockRejectedValue(new Error('No chats'));
+      
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      
+      await botService.start();
+      
+      expect(consoleSpy).toHaveBeenCalledWith('No active chats found in database');
+      
+      consoleSpy.mockRestore();
     });
   });
 
-  describe('bot added to group', () => {
-    it('should handle bot being added to group with informational message', async () => {
-      const mockUpdate: MockUpdate = {
-        update_id: 1,
-        my_chat_member: {
-          chat: {
-            id: -123456789,
-            type: 'group',
-            title: 'Test Group',
-          },
-          from: {
-            id: 123456789,
-            first_name: 'John',
-            username: 'john_doe',
-          },
-          date: Math.floor(Date.now() / 1000),
-          old_chat_member: {
-            user: {
-              id: 987654321,
-              first_name: 'Bot',
-              username: 'testbot',
-            },
-            status: 'left',
-          },
-          new_chat_member: {
-            user: {
-              id: 987654321,
-              first_name: 'Bot',
-              username: 'testbot',
-            },
-            status: 'member',
-          },
-        },
-      };
-
-      // Get the handler function that was registered
-      const onMyChatMemberCall = mockBotInstance.on.mock.calls.find(
-        (call: any[]) => call[0] === 'my_chat_member'
-      );
-      const handler = onMyChatMemberCall[1];
-
-      // Create mock context
-      const mockCtx = {
-        myChatMember: mockUpdate.my_chat_member,
-        chat: mockUpdate.my_chat_member!.chat,
-        reply: jest.fn(),
-      };
-
-      await handler(mockCtx);
-
-      expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('Hello! I\'m the MyDailyPlans bot')
-      );
-      expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('ACTIVE_CHAT_IDS environment variable')
-      );
-      expect(mockCtx.reply).toHaveBeenCalledWith(
-        'Chat ID: `-123456789`',
-        { parse_mode: 'Markdown' }
-      );
-
-      // Chat should already be in scheduler from config initialization
-      const scheduler = botService.getScheduler();
-      expect(scheduler.getActiveChats().has(-123456789)).toBe(true);
-    });
-
-    it('should handle bot being removed from group', async () => {
-      const mockUpdate: MockUpdate = {
-        update_id: 2,
-        my_chat_member: {
-          chat: {
-            id: -123456789,
-            type: 'group',
-            title: 'Test Group',
-          },
-          from: {
-            id: 123456789,
-            first_name: 'John',
-            username: 'john_doe',
-          },
-          date: Math.floor(Date.now() / 1000),
-          old_chat_member: {
-            user: {
-              id: 987654321,
-              first_name: 'Bot',
-              username: 'testbot',
-            },
-            status: 'member',
-          },
-          new_chat_member: {
-            user: {
-              id: 987654321,
-              first_name: 'Bot',
-              username: 'testbot',
-            },
-            status: 'left',
-          },
-        },
-      };
-
-      // Get the handler function
-      const onMyChatMemberCall = mockBotInstance.on.mock.calls.find(
-        (call: any[]) => call[0] === 'my_chat_member'
-      );
-      const handler = onMyChatMemberCall[1];
-
-      const mockCtx = {
-        myChatMember: mockUpdate.my_chat_member,
-        chat: mockUpdate.my_chat_member!.chat,
-        reply: jest.fn(),
-      };
-
-      await handler(mockCtx);
-
-      // Chat should still be in scheduler (only config controls this now)
-      const scheduler = botService.getScheduler();
-      expect(scheduler.getActiveChats().has(-123456789)).toBe(true);
+  describe('stop method', () => {
+    it('should stop the bot', async () => {
+      await botService.stop();
+      
+      expect(mockBot.stop).toHaveBeenCalled();
     });
   });
 
   describe('message handling', () => {
-    it('should track replies from tracked users in active group chats', async () => {
-      const mockUpdate: MockUpdate = {
-        update_id: 3,
-        message: {
-          message_id: 1,
-          from: {
-            id: 123456789,
-            first_name: 'John',
-            username: 'john_doe',
-          },
-          chat: {
-            id: -123456789,
-            type: 'group',
-          },
-          date: Math.floor(Date.now() / 1000),
-          text: 'My daily plan: work on project X',
-        },
-      };
+    let messageHandler: Function;
+    let stateManager: StateManager;
 
+    beforeEach(() => {
       // Get the message handler
-      const onMessageCall = mockBotInstance.on.mock.calls.find(
+      const messageHandlerCall = mockBot.on.mock.calls.find(
         (call: any[]) => call[0] === 'message:text'
       );
-      const handler = onMessageCall[1];
-
-      const mockCtx = {
-        from: mockUpdate.message!.from,
-        chat: mockUpdate.message!.chat,
-        message: mockUpdate.message,
-        reply: jest.fn(),
-      };
-
-      await handler(mockCtx);
-
-      // Check that user was marked as replied
-      const stateManager = botService.getStateManager();
-      const today = new Date().toISOString().split('T')[0];
-      expect(stateManager.hasUserReplied(-123456789, today, 123456789)).toBe(true);
+      messageHandler = messageHandlerCall![1];
+      stateManager = botService.getStateManager();
     });
 
-    it('should not track replies from tracked users in non-active chats', async () => {
-      const mockUpdate: MockUpdate = {
-        update_id: 4,
-        message: {
-          message_id: 2,
-          from: {
-            id: 123456789,
-            first_name: 'John',
-            username: 'john_doe',
-          },
-          chat: {
-            id: -999999999, // Not in activeChatIds
-            type: 'group',
-          },
-          date: Math.floor(Date.now() / 1000),
-          text: 'My daily plan',
-        },
-      };
+    it('should track reply from active user', async () => {
+      const chatId = -123456789;
+      const userId = 123456789;
+      const username = 'testuser';
+      const today = new Date().toISOString().split('T')[0];
 
-      const onMessageCall = mockBotInstance.on.mock.calls.find(
-        (call: any[]) => call[0] === 'message:text'
-      );
-      const handler = onMessageCall[1];
+      // Mock UserService
+      mockUserService.isUserActiveInChat.mockResolvedValue(true);
+      mockUserService.getTrackedUserIdsForChat.mockResolvedValue([userId, 987654321]);
+      mockUserService.upsertUser.mockResolvedValue(undefined);
 
+      // Create mock context
       const mockCtx = {
-        from: mockUpdate.message!.from,
-        chat: mockUpdate.message!.chat,
-        message: mockUpdate.message,
+        from: { id: userId, username },
+        chat: { id: chatId, type: 'group' },
         reply: jest.fn(),
       };
 
-      await handler(mockCtx);
+      await messageHandler(mockCtx);
 
-      // Check that user was NOT marked as replied (inactive chat)
-      const stateManager = botService.getStateManager();
-      const today = new Date().toISOString().split('T')[0];
-      expect(stateManager.hasUserReplied(-999999999, today, 123456789)).toBe(false);
+      expect(mockUserService.isUserActiveInChat).toHaveBeenCalledWith(userId, chatId);
+      expect(mockUserService.upsertUser).toHaveBeenCalledWith(userId, chatId, username);
+      expect(stateManager.hasUserReplied(chatId, today, userId)).toBe(true);
     });
 
-    it('should not track replies from non-tracked users', async () => {
-      const mockUpdate: MockUpdate = {
-        update_id: 5,
-        message: {
-          message_id: 3,
-          from: {
-            id: 999999999, // Not in tracked users
-            first_name: 'Unknown',
-          },
-          chat: {
-            id: -123456789,
-            type: 'group',
-          },
-          date: Math.floor(Date.now() / 1000),
-          text: 'My daily plan',
-        },
-      };
+    it('should not track reply from inactive user', async () => {
+      const chatId = -123456789;
+      const userId = 123456789;
+      const username = 'testuser';
+      const today = new Date().toISOString().split('T')[0];
 
-      const onMessageCall = mockBotInstance.on.mock.calls.find(
-        (call: any[]) => call[0] === 'message:text'
-      );
-      const handler = onMessageCall[1];
+      // Mock UserService
+      mockUserService.isUserActiveInChat.mockResolvedValue(false);
 
+      // Create mock context
       const mockCtx = {
-        from: mockUpdate.message!.from,
-        chat: mockUpdate.message!.chat,
-        message: mockUpdate.message,
+        from: { id: userId, username },
+        chat: { id: chatId, type: 'group' },
         reply: jest.fn(),
       };
 
-      await handler(mockCtx);
+      await messageHandler(mockCtx);
 
-      // Check that user was NOT marked as replied
-      const stateManager = botService.getStateManager();
-      const today = new Date().toISOString().split('T')[0];
-      expect(stateManager.hasUserReplied(-123456789, today, 999999999)).toBe(false);
-    });
-
-    it('should not track replies in private chats', async () => {
-      const mockUpdate: MockUpdate = {
-        update_id: 6,
-        message: {
-          message_id: 4,
-          from: {
-            id: 123456789,
-            first_name: 'John',
-            username: 'john_doe',
-          },
-          chat: {
-            id: 123456789,
-            type: 'private',
-          },
-          date: Math.floor(Date.now() / 1000),
-          text: 'My daily plan',
-        },
-      };
-
-      const onMessageCall = mockBotInstance.on.mock.calls.find(
-        (call: any[]) => call[0] === 'message:text'
-      );
-      const handler = onMessageCall[1];
-
-      const mockCtx = {
-        from: mockUpdate.message!.from,
-        chat: mockUpdate.message!.chat,
-        message: mockUpdate.message,
-        reply: jest.fn(),
-      };
-
-      await handler(mockCtx);
-
-      // Check that user was NOT marked as replied for private chat
-      const stateManager = botService.getStateManager();
-      const today = new Date().toISOString().split('T')[0];
-      expect(stateManager.hasUserReplied(123456789, today, 123456789)).toBe(false);
+      expect(mockUserService.isUserActiveInChat).toHaveBeenCalledWith(userId, chatId);
+      expect(mockUserService.upsertUser).not.toHaveBeenCalled();
+      expect(stateManager.hasUserReplied(chatId, today, userId)).toBe(false);
     });
 
     it('should send confirmation when all users have replied', async () => {
-      const stateManager = botService.getStateManager();
-      const today = new Date().toISOString().split('T')[0];
       const chatId = -123456789;
+      const userId = 123456789;
+      const username = 'testuser';
 
-      // Mark first user as already replied
-      stateManager.markUserReplied(chatId, today, 987654321);
+      // Mock UserService
+      mockUserService.isUserActiveInChat.mockResolvedValue(true);
+      mockUserService.getTrackedUserIdsForChat.mockResolvedValue([userId]); // Only one user
+      mockUserService.upsertUser.mockResolvedValue(undefined);
 
-      const mockUpdate: MockUpdate = {
-        update_id: 7,
-        message: {
-          message_id: 5,
-          from: {
-            id: 123456789,
-            first_name: 'John',
-            username: 'john_doe',
-          },
-          chat: {
-            id: chatId,
-            type: 'group',
-          },
-          date: Math.floor(Date.now() / 1000),
-          text: 'My daily plan',
-        },
-      };
-
-      const onMessageCall = mockBotInstance.on.mock.calls.find(
-        (call: any[]) => call[0] === 'message:text'
-      );
-      const handler = onMessageCall[1];
-
+      // Create mock context
       const mockCtx = {
-        from: mockUpdate.message!.from,
-        chat: mockUpdate.message!.chat,
-        message: mockUpdate.message,
+        from: { id: userId, username },
+        chat: { id: chatId, type: 'group' },
         reply: jest.fn(),
       };
 
-      await handler(mockCtx);
+      await messageHandler(mockCtx);
 
-      expect(mockCtx.reply).toHaveBeenCalledWith('✅ Great! Everyone has shared their daily plans.');
+      expect(mockCtx.reply).toHaveBeenCalledWith('✅ Отлично! Все поделились своими планами на день.');
+    });
+
+    it('should ignore messages without userId or username', async () => {
+      const mockCtx = {
+        from: { id: null, username: null },
+        chat: { id: -123456789, type: 'group' },
+        reply: jest.fn(),
+      };
+
+      await messageHandler(mockCtx);
+
+      expect(mockUserService.isUserActiveInChat).not.toHaveBeenCalled();
+    });
+
+    it('should ignore messages in private chats for tracking', async () => {
+      const mockCtx = {
+        from: { id: 123456789, username: 'testuser' },
+        chat: { id: 123456789, type: 'private' },
+        reply: jest.fn(),
+      };
+
+      mockUserService.isUserActiveInChat.mockResolvedValue(true);
+
+      await messageHandler(mockCtx);
+
+      // Should still check if user is active and update user info
+      expect(mockUserService.isUserActiveInChat).toHaveBeenCalled();
+      expect(mockUserService.upsertUser).toHaveBeenCalled();
+
+      // But should not mark as replied or send confirmation
+      expect(mockCtx.reply).not.toHaveBeenCalled();
     });
   });
 
   describe('status command', () => {
-    it('should show status in active group chat', async () => {
-      const stateManager = botService.getStateManager();
-      const today = new Date().toISOString().split('T')[0];
-      const chatId = -123456789;
+    let statusHandler: Function;
 
-      // Set up some state
-      stateManager.markUserReplied(chatId, today, 123456789);
-      stateManager.incrementReminderCount(chatId, today);
-
-      const statusCommandCall = mockBotInstance.command.mock.calls.find(
+    beforeEach(() => {
+      // Get the status command handler
+      const statusHandlerCall = mockBot.command.mock.calls.find(
         (call: any[]) => call[0] === 'status'
       );
-      const handler = statusCommandCall[1];
+      statusHandler = statusHandlerCall![1];
+    });
+
+    it('should show status for group chat', async () => {
+      const chatId = -123456789;
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Mock user data
+      const trackedUsers = [
+        { telegramId: 123456789, username: 'user1' },
+        { telegramId: 987654321, username: 'user2' },
+      ];
+      
+      mockUserService.getActiveUsersForChat.mockResolvedValue(trackedUsers);
 
       const mockCtx = {
         chat: { id: chatId, type: 'group' },
         reply: jest.fn(),
       };
 
-      await handler(mockCtx);
+      await statusHandler(mockCtx);
 
+      expect(mockUserService.getActiveUsersForChat).toHaveBeenCalledWith(chatId);
       expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringMatching(/Daily Plans Status for \d{4}-\d{2}-\d{2}/)
-      );
-      expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('✅ Replied: 1/2')
-      );
-      expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('⏰ Reminders sent: 1/4')
+        expect.stringContaining('📊 Статус ежедневных планов'),
+        { parse_mode: 'Markdown' }
       );
     });
 
-    it('should show configuration message for inactive group chat', async () => {
-      const statusCommandCall = mockBotInstance.command.mock.calls.find(
-        (call: any[]) => call[0] === 'status'
-      );
-      const handler = statusCommandCall[1];
+    it('should handle case when no tracked users exist', async () => {
+      const chatId = -123456789;
+      
+      mockUserService.getActiveUsersForChat.mockResolvedValue([]);
 
       const mockCtx = {
-        chat: { id: -999999999, type: 'group' }, // Not in activeChatIds
+        chat: { id: chatId, type: 'group' },
         reply: jest.fn(),
       };
 
-      await handler(mockCtx);
+      await statusHandler(mockCtx);
 
       expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('This chat is not configured to receive reminders'),
-        { parse_mode: 'Markdown' }
-      );
-      expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('Chat ID: `-999999999`')
+        '⚠️ В этом чате нет отслеживаемых пользователей.\n\n' +
+        'Обратитесь к администратору для настройки отслеживания участников команды.'
       );
     });
 
     it('should reject status command in private chat', async () => {
-      const statusCommandCall = mockBotInstance.command.mock.calls.find(
-        (call: any[]) => call[0] === 'status'
-      );
-      const handler = statusCommandCall[1];
-
       const mockCtx = {
-        chat: { id: 123456789, type: 'private' },
+        chat: { type: 'private' },
         reply: jest.fn(),
       };
 
-      await handler(mockCtx);
+      await statusHandler(mockCtx);
 
-      expect(mockCtx.reply).toHaveBeenCalledWith('This command only works in group chats.');
+      expect(mockCtx.reply).toHaveBeenCalledWith('Эта команда работает только в групповых чатах.');
+    });
+
+    it('should handle errors gracefully', async () => {
+      const chatId = -123456789;
+      
+      mockUserService.getActiveUsersForChat.mockRejectedValue(new Error('Database error'));
+
+      const mockCtx = {
+        chat: { id: chatId, type: 'group' },
+        reply: jest.fn(),
+      };
+
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await statusHandler(mockCtx);
+
+      expect(consoleSpy).toHaveBeenCalledWith('Error getting status:', expect.any(Error));
+      expect(mockCtx.reply).toHaveBeenCalledWith('❌ Ошибка при получении статуса.');
+
+      consoleSpy.mockRestore();
     });
   });
 
   describe('help command', () => {
-    it('should show help message with setup instructions', async () => {
-      const helpCommandCall = mockBotInstance.command.mock.calls.find(
+    let helpHandler: Function;
+
+    beforeEach(() => {
+      // Get the help command handler
+      const helpHandlerCall = mockBot.command.mock.calls.find(
         (call: any[]) => call[0] === 'help'
       );
-      const handler = helpCommandCall[1];
+      helpHandler = helpHandlerCall![1];
+    });
 
+    it('should send help message', async () => {
       const mockCtx = {
         reply: jest.fn(),
       };
 
-      await handler(mockCtx);
+      await helpHandler(mockCtx);
 
       expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('MyDailyPlans Bot Help'),
+        expect.stringContaining('🤖 *Справка MyDailyPlans Bot*'),
         { parse_mode: 'Markdown' }
       );
+    });
+  });
+
+  describe('chat member events', () => {
+    let chatMemberHandler: Function;
+
+    beforeEach(() => {
+      // Get the chat member handler
+      const chatMemberHandlerCall = mockBot.on.mock.calls.find(
+        (call: any[]) => call[0] === 'my_chat_member'
+      );
+      chatMemberHandler = chatMemberHandlerCall![1];
+    });
+
+    it('should send welcome message when bot is added to chat', async () => {
+      const mockCtx = {
+        myChatMember: {
+          new_chat_member: { status: 'member' },
+        },
+        chat: { id: -123456789, title: 'Test Group' },
+        reply: jest.fn(),
+      };
+
+      await chatMemberHandler(mockCtx);
+
       expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('ACTIVE_CHAT_IDS environment variable')
+        expect.stringContaining('👋 Привет! Я бот *MyDailyPlans*'),
+        { parse_mode: 'Markdown' }
       );
     });
-  });
 
-  describe('service lifecycle', () => {
-    it('should start bot and scheduler with configuration logging', async () => {
-      await botService.start();
-
-      expect(mockBotInstance.start).toHaveBeenCalled();
-    });
-
-    it('should stop bot', async () => {
-      await botService.stop();
-
-      expect(mockBotInstance.stop).toHaveBeenCalled();
-    });
-  });
-
-  describe('manual reminder trigger', () => {
-    it('should trigger initial reminder when hour 6 is specified', async () => {
-      const scheduler = botService.getScheduler();
-      const sendInitialReminderSpy = jest.spyOn(scheduler, 'sendInitialReminder').mockResolvedValue();
-      const sendFollowUpReminderSpy = jest.spyOn(scheduler, 'sendFollowUpReminder').mockResolvedValue();
+    it('should log when bot is removed from chat', async () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
       
+      const mockCtx = {
+        myChatMember: {
+          new_chat_member: { status: 'left' },
+        },
+        chat: { id: -123456789 },
+        reply: jest.fn(),
+      };
+
+      await chatMemberHandler(mockCtx);
+
+      expect(consoleSpy).toHaveBeenCalledWith('Bot removed from chat: -123456789');
+      expect(mockCtx.reply).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('triggerReminder', () => {
+    it('should trigger initial reminder for hour 6', async () => {
       await botService.triggerReminder(6);
 
-      expect(sendInitialReminderSpy).toHaveBeenCalled();
-      expect(sendFollowUpReminderSpy).not.toHaveBeenCalled();
-
-      sendInitialReminderSpy.mockRestore();
-      sendFollowUpReminderSpy.mockRestore();
+      expect(mockScheduler.sendInitialReminder).toHaveBeenCalled();
+      expect(mockScheduler.sendFollowUpReminder).not.toHaveBeenCalled();
     });
 
-    it('should trigger follow-up reminder when other hour is specified', async () => {
-      const scheduler = botService.getScheduler();
-      const sendInitialReminderSpy = jest.spyOn(scheduler, 'sendInitialReminder').mockResolvedValue();
-      const sendFollowUpReminderSpy = jest.spyOn(scheduler, 'sendFollowUpReminder').mockResolvedValue();
-      
+    it('should trigger follow-up reminder for other hours', async () => {
       await botService.triggerReminder(9);
 
-      expect(sendFollowUpReminderSpy).toHaveBeenCalled();
-      expect(sendInitialReminderSpy).not.toHaveBeenCalled();
-
-      sendInitialReminderSpy.mockRestore();
-      sendFollowUpReminderSpy.mockRestore();
+      expect(mockScheduler.sendFollowUpReminder).toHaveBeenCalled();
+      expect(mockScheduler.sendInitialReminder).not.toHaveBeenCalled();
     });
 
-    it('should trigger initial reminder at 6 AM when no hour specified', async () => {
-      const scheduler = botService.getScheduler();
-      const sendInitialReminderSpy = jest.spyOn(scheduler, 'sendInitialReminder').mockResolvedValue();
-      const sendFollowUpReminderSpy = jest.spyOn(scheduler, 'sendFollowUpReminder').mockResolvedValue();
-      
-      // Mock current hour to be 6
-      jest.useFakeTimers();
-      jest.setSystemTime(new Date('2023-12-15T06:00:00.000Z'));
-
+    it('should trigger follow-up reminder when no hour specified', async () => {
       await botService.triggerReminder();
 
-      expect(sendInitialReminderSpy).toHaveBeenCalled();
-      expect(sendFollowUpReminderSpy).not.toHaveBeenCalled();
-
-      jest.useRealTimers();
-      sendInitialReminderSpy.mockRestore();
-      sendFollowUpReminderSpy.mockRestore();
-    });
-
-    it('should trigger follow-up reminder at other hours when no hour specified', async () => {
-      const scheduler = botService.getScheduler();
-      const sendInitialReminderSpy = jest.spyOn(scheduler, 'sendInitialReminder').mockResolvedValue();
-      const sendFollowUpReminderSpy = jest.spyOn(scheduler, 'sendFollowUpReminder').mockResolvedValue();
-      
-      // Mock current hour to be 9
-      jest.useFakeTimers();
-      jest.setSystemTime(new Date('2023-12-15T09:00:00.000Z'));
-
-      await botService.triggerReminder();
-
-      expect(sendFollowUpReminderSpy).toHaveBeenCalled();
-      expect(sendInitialReminderSpy).not.toHaveBeenCalled();
-
-      jest.useRealTimers();
-      sendInitialReminderSpy.mockRestore();
-      sendFollowUpReminderSpy.mockRestore();
+      expect(mockScheduler.sendFollowUpReminder).toHaveBeenCalled();
+      expect(mockScheduler.sendInitialReminder).not.toHaveBeenCalled();
     });
   });
 }); 
