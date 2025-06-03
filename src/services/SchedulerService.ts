@@ -1,18 +1,21 @@
 import * as cron from 'node-cron';
 import { Bot } from 'grammy';
-import { StateManager } from './stateManager';
 import { UserService } from './UserService';
+import { PlanService } from './PlanService';
+import { ReminderService } from './ReminderService';
 import { REMINDER_SCHEDULE, WORKING_DAYS } from '../types';
 import { User } from '../entities';
 
 export class SchedulerService {
-  private stateManager: StateManager;
+  private planService: PlanService;
+  private reminderService: ReminderService;
   private bot: Bot;
   private userService: UserService;
 
-  constructor(bot: Bot, stateManager: StateManager, userService: UserService) {
+  constructor(bot: Bot, planService: PlanService, reminderService: ReminderService, userService: UserService) {
     this.bot = bot;
-    this.stateManager = stateManager;
+    this.planService = planService;
+    this.reminderService = reminderService;
     this.userService = userService;
   }
 
@@ -47,16 +50,16 @@ export class SchedulerService {
 
       for (const chatId of activeChatIds) {
         try {
-          const state = this.stateManager.getState(chatId, date);
+          const reminderCount = await this.reminderService.getReminderCount(chatId, date);
 
           // Reset state for new day if it's the first reminder
-          if (state.reminderCount === 0) {
-            this.stateManager.resetStateForDate(chatId, date);
+          if (reminderCount === 0) {
+            await this.reminderService.resetReminderState(chatId, date);
           }
 
           const message = this.getInitialReminderMessage();
           await this.bot.api.sendMessage(chatId, message);
-          this.stateManager.incrementReminderCount(chatId, date);
+          await this.reminderService.incrementReminderCount(chatId, date);
 
           console.log(`Sent initial reminder to chat ${chatId} for date ${date}`);
         } catch (error) {
@@ -76,15 +79,15 @@ export class SchedulerService {
 
       for (const chatId of activeChatIds) {
         try {
-          const state = this.stateManager.getState(chatId, date);
+          const reminderCount = await this.reminderService.getReminderCount(chatId, date);
 
           // Only send follow-up if we haven't exceeded the limit (4 total reminders)
-          if (state.reminderCount >= 4) {
+          if (reminderCount >= 4) {
             continue;
           }
 
           const trackedUserIds = await this.userService.getTrackedUserIdsForChat(chatId);
-          const unrepliedUserIds = this.stateManager.getUnrepliedUserIds(chatId, date, trackedUserIds);
+          const unrepliedUserIds = await this.planService.getUnrepliedUserIds(chatId, date, trackedUserIds);
 
           // Skip if everyone has replied
           if (unrepliedUserIds.length === 0) {
@@ -93,7 +96,7 @@ export class SchedulerService {
 
           const message = await this.getFollowUpReminderMessage(chatId, unrepliedUserIds);
           await this.bot.api.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-          this.stateManager.incrementReminderCount(chatId, date);
+          await this.reminderService.incrementReminderCount(chatId, date);
 
           console.log(`Sent follow-up reminder to chat ${chatId} for date ${date}, ${unrepliedUserIds.length} users pending`);
         } catch (error) {
@@ -109,6 +112,11 @@ export class SchedulerService {
     return '🌅 Всем доброе утро! Пожалуйста, поделитесь своими планами на день.';
   }
 
+  private escapeMarkdown(text: string): string {
+    // Escape underscores in usernames for Markdown
+    return text.replace(/_/g, '\\_');
+  }
+
   private async getFollowUpReminderMessage(chatId: number, unrepliedUserIds: number[]): Promise<string> {
     const mentions: string[] = [];
     const activeUsers = await this.userService.getActiveUsersForChat(chatId);
@@ -116,7 +124,8 @@ export class SchedulerService {
     for (const userId of unrepliedUserIds) {
       const user = activeUsers.find((u: User) => u.telegramId === userId);
       if (user) {
-        mentions.push(`@${user.username}`);
+        const escapedUsername = this.escapeMarkdown(user.username);
+        mentions.push(`@${escapedUsername}`);
       } else {
         mentions.push(`[Пользователь ${userId}](tg://user?id=${userId})`);
       }
@@ -130,4 +139,4 @@ export class SchedulerService {
   public async getActiveChatIds(): Promise<number[]> {
     return this.userService.getActiveChatIds();
   }
-}
+} 

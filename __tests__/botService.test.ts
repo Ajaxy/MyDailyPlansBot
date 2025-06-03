@@ -1,5 +1,4 @@
-import { BotService } from '../src/services/botService';
-import { StateManager } from '../src/services/stateManager';
+import { BotService } from '../src/services/BotService';
 import { MockUpdate } from '../src/types';
 
 // Mock the Bot
@@ -44,6 +43,36 @@ jest.mock('../src/services/UserService', () => {
   };
 });
 
+// Mock PlanService
+const mockPlanService = {
+  insertPlan: jest.fn(),
+  getRepliedUserIds: jest.fn(),
+  hasUserReplied: jest.fn(),
+  getUnrepliedUserIds: jest.fn(),
+  getPlanCount: jest.fn(),
+  removeAllPlansForDate: jest.fn(),
+};
+
+jest.mock('../src/services/PlanService', () => {
+  return {
+    PlanService: jest.fn().mockImplementation(() => mockPlanService),
+  };
+});
+
+// Mock ReminderService
+const mockReminderService = {
+  getReminderCount: jest.fn(),
+  incrementReminderCount: jest.fn(),
+  resetReminderState: jest.fn(),
+  getLastReminderTime: jest.fn(),
+};
+
+jest.mock('../src/services/ReminderService', () => {
+  return {
+    ReminderService: jest.fn().mockImplementation(() => mockReminderService),
+  };
+});
+
 // Mock SchedulerService
 const mockScheduler = {
   start: jest.fn(),
@@ -51,7 +80,7 @@ const mockScheduler = {
   sendFollowUpReminder: jest.fn(),
 };
 
-jest.mock('../src/services/scheduler', () => ({
+jest.mock('../src/services/SchedulerService', () => ({
   SchedulerService: jest.fn().mockImplementation(() => mockScheduler),
 }));
 
@@ -67,7 +96,8 @@ describe('BotService', () => {
     it('should initialize bot service with required components', () => {
       expect(botService).toBeDefined();
       expect(botService.getBot()).toBe(mockBot);
-      expect(botService.getStateManager()).toBeInstanceOf(StateManager);
+      expect(botService.getPlanService()).toBeDefined();
+      expect(botService.getReminderService()).toBeDefined();
       expect(botService.getScheduler()).toBeDefined();
       expect(botService.getUserService()).toBeDefined();
     });
@@ -114,7 +144,6 @@ describe('BotService', () => {
 
   describe('message handling', () => {
     let messageHandler: Function;
-    let stateManager: StateManager;
 
     beforeEach(() => {
       // Get the message handler
@@ -122,24 +151,29 @@ describe('BotService', () => {
         (call: any[]) => call[0] === 'message:text'
       );
       messageHandler = messageHandlerCall![1];
-      stateManager = botService.getStateManager();
     });
 
     it('should track reply from active user', async () => {
       const chatId = -123456789;
       const userId = 123456789;
       const username = 'testuser';
+      const messageId = 123;
+      const messageText = 'My daily plan';
       const today = new Date().toISOString().split('T')[0];
 
-      // Mock UserService
+      // Mock services
       mockUserService.isUserActiveInChat.mockResolvedValue(true);
       mockUserService.getTrackedUserIdsForChat.mockResolvedValue([userId, 987654321]);
       mockUserService.upsertUser.mockResolvedValue(undefined);
+      mockPlanService.hasUserReplied.mockResolvedValue(false);
+      mockPlanService.insertPlan.mockResolvedValue({});
+      mockPlanService.getUnrepliedUserIds.mockResolvedValue([987654321]); // One user still pending
 
       // Create mock context
       const mockCtx = {
         from: { id: userId, username },
         chat: { id: chatId, type: 'group' },
+        message: { message_id: messageId, text: messageText },
         reply: jest.fn(),
       };
 
@@ -147,14 +181,16 @@ describe('BotService', () => {
 
       expect(mockUserService.isUserActiveInChat).toHaveBeenCalledWith(userId, chatId);
       expect(mockUserService.upsertUser).toHaveBeenCalledWith(userId, chatId, username);
-      expect(stateManager.hasUserReplied(chatId, today, userId)).toBe(true);
+      expect(mockPlanService.hasUserReplied).toHaveBeenCalledWith(chatId, today, userId);
+      expect(mockPlanService.insertPlan).toHaveBeenCalledWith(userId, chatId, today, messageId, messageText);
     });
 
     it('should not track reply from inactive user', async () => {
       const chatId = -123456789;
       const userId = 123456789;
       const username = 'testuser';
-      const today = new Date().toISOString().split('T')[0];
+      const messageId = 123;
+      const messageText = 'My daily plan';
 
       // Mock UserService
       mockUserService.isUserActiveInChat.mockResolvedValue(false);
@@ -163,6 +199,7 @@ describe('BotService', () => {
       const mockCtx = {
         from: { id: userId, username },
         chat: { id: chatId, type: 'group' },
+        message: { message_id: messageId, text: messageText },
         reply: jest.fn(),
       };
 
@@ -170,23 +207,29 @@ describe('BotService', () => {
 
       expect(mockUserService.isUserActiveInChat).toHaveBeenCalledWith(userId, chatId);
       expect(mockUserService.upsertUser).not.toHaveBeenCalled();
-      expect(stateManager.hasUserReplied(chatId, today, userId)).toBe(false);
+      expect(mockPlanService.insertPlan).not.toHaveBeenCalled();
     });
 
     it('should send confirmation when all users have replied', async () => {
       const chatId = -123456789;
       const userId = 123456789;
       const username = 'testuser';
+      const messageId = 123;
+      const messageText = 'My daily plan';
 
-      // Mock UserService
+      // Mock services
       mockUserService.isUserActiveInChat.mockResolvedValue(true);
       mockUserService.getTrackedUserIdsForChat.mockResolvedValue([userId]); // Only one user
       mockUserService.upsertUser.mockResolvedValue(undefined);
+      mockPlanService.hasUserReplied.mockResolvedValue(false);
+      mockPlanService.insertPlan.mockResolvedValue({});
+      mockPlanService.getUnrepliedUserIds.mockResolvedValue([]); // All users replied
 
       // Create mock context
       const mockCtx = {
         from: { id: userId, username },
         chat: { id: chatId, type: 'group' },
+        message: { message_id: messageId, text: messageText },
         reply: jest.fn(),
       };
 
@@ -195,10 +238,37 @@ describe('BotService', () => {
       expect(mockCtx.reply).toHaveBeenCalledWith('✅ Отлично! Все поделились своими планами на день.');
     });
 
-    it('should ignore messages without userId or username', async () => {
+    it('should not track duplicate replies', async () => {
+      const chatId = -123456789;
+      const userId = 123456789;
+      const username = 'testuser';
+      const messageId = 123;
+      const messageText = 'My daily plan';
+
+      // Mock services
+      mockUserService.isUserActiveInChat.mockResolvedValue(true);
+      mockUserService.upsertUser.mockResolvedValue(undefined);
+      mockPlanService.hasUserReplied.mockResolvedValue(true); // User already replied
+
+      // Create mock context
+      const mockCtx = {
+        from: { id: userId, username },
+        chat: { id: chatId, type: 'group' },
+        message: { message_id: messageId, text: messageText },
+        reply: jest.fn(),
+      };
+
+      await messageHandler(mockCtx);
+
+      expect(mockPlanService.insertPlan).not.toHaveBeenCalled();
+      expect(mockCtx.reply).not.toHaveBeenCalled();
+    });
+
+    it('should ignore messages without required fields', async () => {
       const mockCtx = {
         from: { id: null, username: null },
         chat: { id: -123456789, type: 'group' },
+        message: { message_id: 123, text: null },
         reply: jest.fn(),
       };
 
@@ -211,6 +281,7 @@ describe('BotService', () => {
       const mockCtx = {
         from: { id: 123456789, username: 'testuser' },
         chat: { id: 123456789, type: 'private' },
+        message: { message_id: 123, text: 'My plan' },
         reply: jest.fn(),
       };
 
@@ -222,7 +293,8 @@ describe('BotService', () => {
       expect(mockUserService.isUserActiveInChat).toHaveBeenCalled();
       expect(mockUserService.upsertUser).toHaveBeenCalled();
 
-      // But should not mark as replied or send confirmation
+      // But should not track plan or send confirmation
+      expect(mockPlanService.insertPlan).not.toHaveBeenCalled();
       expect(mockCtx.reply).not.toHaveBeenCalled();
     });
   });
@@ -249,6 +321,9 @@ describe('BotService', () => {
       ];
       
       mockUserService.getActiveUsersForChat.mockResolvedValue(trackedUsers);
+      mockPlanService.getRepliedUserIds.mockResolvedValue([123456789]);
+      mockPlanService.getUnrepliedUserIds.mockResolvedValue([987654321]);
+      mockReminderService.getReminderCount.mockResolvedValue(2);
 
       const mockCtx = {
         chat: { id: chatId, type: 'group' },
@@ -258,6 +333,8 @@ describe('BotService', () => {
       await statusHandler(mockCtx);
 
       expect(mockUserService.getActiveUsersForChat).toHaveBeenCalledWith(chatId);
+      expect(mockPlanService.getRepliedUserIds).toHaveBeenCalledWith(chatId, today);
+      expect(mockReminderService.getReminderCount).toHaveBeenCalledWith(chatId, today);
       expect(mockCtx.reply).toHaveBeenCalledWith(
         expect.stringContaining('📊 Статус ежедневных планов'),
         { parse_mode: 'Markdown' }

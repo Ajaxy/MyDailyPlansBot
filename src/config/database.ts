@@ -3,6 +3,8 @@ import * as path from 'path';
 import { env } from './dotenv';
 import {
   User,
+  Plan,
+  ReminderState,
 } from '../entities';
 
 // Import pg to define custom type parser for bigint
@@ -28,6 +30,8 @@ export const AppDataSource = new DataSource({
   logging: false,
   entities: [
     User,
+    Plan,
+    ReminderState,
   ],
   migrations: [path.join(__dirname, '../migrations/**/*.ts')],
   subscribers: [],

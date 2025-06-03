@@ -2,24 +2,19 @@ import { spawn } from 'child_process';
 import path from 'path';
 import dotenv from 'dotenv';
 import { Client } from 'pg';
+import { env } from '../src/config/dotenv';
 
-// Load environment variables from .env file
+// Load environment variables from .env file if it exists
 const result = dotenv.config({
   path: path.resolve(process.cwd(), '.env'),
 });
 
 if (result.error) {
-  console.error('Error loading .env file:', result.error);
-  process.exit(1);
+  console.warn('Warning: .env file not found or cannot be read. Using environment variables.');
 }
 
-const {
-  DB_HOST = 'localhost',
-  DB_PORT = '5432',
-  DB_USERNAME = 'postgres',
-  DB_PASSWORD = 'postgres',
-  DB_DATABASE = 'mdp',
-} = process.env;
+// Use the existing database configuration from dotenv
+const { host: DB_HOST, port: DB_PORT, username: DB_USERNAME, password: DB_PASSWORD, database: DB_DATABASE } = env.database;
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -39,10 +34,11 @@ async function setupDatabase(): Promise<void> {
     // Connect to the default 'postgres' database first
     const client = new Client({
       host: DB_HOST,
-      port: parseInt(DB_PORT, 10),
+      port: parseInt(DB_PORT.toString(), 10),
       user: DB_USERNAME,
       password: DB_PASSWORD,
       database: 'postgres', // Connect to default database
+      ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false, // Enable SSL for Heroku
     });
 
     await client.connect();

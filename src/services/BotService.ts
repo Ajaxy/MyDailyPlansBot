@@ -1,13 +1,15 @@
 import { Bot, Context, GrammyError, HttpError } from 'grammy';
-import { StateManager } from './stateManager';
-import { SchedulerService } from './scheduler';
+import { SchedulerService } from './SchedulerService';
 import { UserService } from './UserService';
+import { PlanService } from './PlanService';
+import { ReminderService } from './ReminderService';
 import { BotConfig } from '../types';
 import { User } from '../entities';
 
 export class BotService {
   private bot: Bot;
-  private stateManager: StateManager;
+  private planService: PlanService;
+  private reminderService: ReminderService;
   private scheduler: SchedulerService;
   private userService: UserService;
   private config: BotConfig;
@@ -15,9 +17,10 @@ export class BotService {
   constructor(config: BotConfig) {
     this.config = config;
     this.bot = new Bot(config.token);
-    this.stateManager = new StateManager();
+    this.planService = new PlanService();
+    this.reminderService = new ReminderService();
     this.userService = new UserService();
-    this.scheduler = new SchedulerService(this.bot, this.stateManager, this.userService);
+    this.scheduler = new SchedulerService(this.bot, this.planService, this.reminderService, this.userService);
 
     this.setupHandlers();
     this.setupErrorHandling();
@@ -66,14 +69,14 @@ export class BotService {
         }
 
         const date = this.getCurrentDate();
-        const repliedUserIds = this.stateManager.getRepliedUserIds(chatId, date);
+        const repliedUserIds = await this.planService.getRepliedUserIds(chatId, date);
         const trackedUserIds = trackedUsers.map((u: User) => u.telegramId);
-        const unrepliedUserIds = this.stateManager.getUnrepliedUserIds(chatId, date, trackedUserIds);
-        const reminderCount = this.stateManager.getReminderCount(chatId, date);
+        const unrepliedUserIds = await this.planService.getUnrepliedUserIds(chatId, date, trackedUserIds);
+        const reminderCount = await this.reminderService.getReminderCount(chatId, date);
 
         let statusMessage = `📊 Статус ежедневных планов на ${date}:`;
         statusMessage += `\n\n⏰ Отправлено напоминаний: ${reminderCount}/4`;
-        statusMessage += `\n✅ Ответили: ${repliedUserIds.size}/${trackedUsers.length}`;
+        statusMessage += `\n✅ Ответили: ${repliedUserIds.length}/${trackedUsers.length}`;
 
         if (unrepliedUserIds.length > 0) {
           statusMessage += `\n⏳ Ожидаем ответов: ${unrepliedUserIds.length}`;
@@ -117,8 +120,10 @@ export class BotService {
       const userId = ctx.from?.id;
       const chatId = ctx.chat.id;
       const username = ctx.from?.username;
+      const messageId = ctx.message.message_id;
+      const messageText = ctx.message.text;
 
-      if (!userId || !username) return;
+      if (!userId || !username || !messageText) return;
 
       try {
         // Check if this is a tracked user in this chat
@@ -132,18 +137,25 @@ export class BotService {
         if (isTracked && ctx.chat.type !== 'private') {
           const date = this.getCurrentDate();
 
-          // Mark user as replied if they haven't already
-          if (!this.stateManager.hasUserReplied(chatId, date, userId)) {
-            this.stateManager.markUserReplied(chatId, date, userId);
+          // Check if user has already replied today
+          const hasReplied = await this.planService.hasUserReplied(chatId, date, userId);
+
+          if (!hasReplied) {
+            // Save the plan to database
+            await this.planService.insertPlan(userId, chatId, date, messageId, messageText);
             console.log(`User ${userId} replied with daily plan in chat ${chatId} for date ${date}`);
 
             // Check if everyone has replied
             const trackedUserIds = await this.userService.getTrackedUserIdsForChat(chatId);
-            const unrepliedUserIds = this.stateManager.getUnrepliedUserIds(chatId, date, trackedUserIds);
+            const unrepliedUserIds = await this.planService.getUnrepliedUserIds(chatId, date, trackedUserIds);
 
             if (unrepliedUserIds.length === 0) {
               await ctx.reply('✅ Отлично! Все поделились своими планами на день.');
             }
+          } else {
+            // User already replied today, save additional plan but don't send confirmation
+            await this.planService.insertPlan(userId, chatId, date, messageId, messageText);
+            console.log(`User ${userId} sent additional daily plan in chat ${chatId} for date ${date}`);
           }
         }
       } catch (error) {
@@ -201,8 +213,12 @@ export class BotService {
     return this.bot;
   }
 
-  public getStateManager(): StateManager {
-    return this.stateManager;
+  public getPlanService(): PlanService {
+    return this.planService;
+  }
+
+  public getReminderService(): ReminderService {
+    return this.reminderService;
   }
 
   public getScheduler(): SchedulerService {
@@ -231,4 +247,4 @@ export class BotService {
       await scheduler.sendFollowUpReminder();
     }
   }
-}
+} 

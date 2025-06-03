@@ -1,5 +1,4 @@
-import { SchedulerService } from '../src/services/scheduler';
-import { StateManager } from '../src/services/stateManager';
+import { SchedulerService } from '../src/services/SchedulerService';
 
 // Mock node-cron
 jest.mock('node-cron', () => ({
@@ -7,13 +6,45 @@ jest.mock('node-cron', () => ({
 }));
 
 // Mock UserService
+const mockUserService = {
+  getActiveChatIds: jest.fn(),
+  getTrackedUserIdsForChat: jest.fn(),
+  getActiveUsersForChat: jest.fn(),
+};
+
 jest.mock('../src/services/UserService', () => {
   return {
-    UserService: jest.fn().mockImplementation(() => ({
-      getActiveChatIds: jest.fn(),
-      getTrackedUserIdsForChat: jest.fn(),
-      getActiveUsersForChat: jest.fn(),
-    })),
+    UserService: jest.fn().mockImplementation(() => mockUserService),
+  };
+});
+
+// Mock PlanService
+const mockPlanService = {
+  insertPlan: jest.fn(),
+  getRepliedUserIds: jest.fn(),
+  hasUserReplied: jest.fn(),
+  getUnrepliedUserIds: jest.fn(),
+  getPlanCount: jest.fn(),
+  removeAllPlansForDate: jest.fn(),
+};
+
+jest.mock('../src/services/PlanService', () => {
+  return {
+    PlanService: jest.fn().mockImplementation(() => mockPlanService),
+  };
+});
+
+// Mock ReminderService
+const mockReminderService = {
+  getReminderCount: jest.fn(),
+  incrementReminderCount: jest.fn(),
+  resetReminderState: jest.fn(),
+  getLastReminderTime: jest.fn(),
+};
+
+jest.mock('../src/services/ReminderService', () => {
+  return {
+    ReminderService: jest.fn().mockImplementation(() => mockReminderService),
   };
 });
 
@@ -26,8 +57,6 @@ const mockBot = {
 
 describe('SchedulerService', () => {
   let scheduler: SchedulerService;
-  let stateManager: StateManager;
-  let mockUserService: any;
   let mockSchedule: jest.Mock;
 
   beforeEach(() => {
@@ -36,13 +65,7 @@ describe('SchedulerService', () => {
     const cron = require('node-cron');
     mockSchedule = cron.schedule;
     
-    stateManager = new StateManager();
-    
-    // Create mock UserService
-    const { UserService } = require('../src/services/UserService');
-    mockUserService = new UserService();
-    
-    scheduler = new SchedulerService(mockBot as any, stateManager, mockUserService);
+    scheduler = new SchedulerService(mockBot as any, mockPlanService as any, mockReminderService as any, mockUserService as any);
   });
 
   describe('scheduler start', () => {
@@ -81,8 +104,10 @@ describe('SchedulerService', () => {
     it('should send initial reminder to active chats', async () => {
       const chatId = -123456789;
       
-      // Mock UserService to return active chats
+      // Mock services
       mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
+      mockReminderService.getReminderCount.mockResolvedValue(0);
+      mockReminderService.incrementReminderCount.mockResolvedValue(1);
       
       scheduler.start();
 
@@ -101,7 +126,29 @@ describe('SchedulerService', () => {
 
       // Verify reminder count was incremented
       const today = '2023-12-15';
-      expect(stateManager.getReminderCount(chatId, today)).toBe(1);
+      expect(mockReminderService.incrementReminderCount).toHaveBeenCalledWith(chatId, today);
+    });
+
+    it('should reset state for new day when reminder count is 0', async () => {
+      const chatId = -123456789;
+      const today = '2023-12-15';
+      
+      // Mock services
+      mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
+      mockReminderService.getReminderCount.mockResolvedValue(0);
+      mockReminderService.resetReminderState.mockResolvedValue();
+      mockReminderService.incrementReminderCount.mockResolvedValue(1);
+      
+      scheduler.start();
+
+      const initialReminderCall = mockSchedule.mock.calls.find(
+        (call: any[]) => call[0] === '0 6 * * 1-5'
+      );
+      const initialReminderFunc = initialReminderCall![1];
+
+      await initialReminderFunc();
+
+      expect(mockReminderService.resetReminderState).toHaveBeenCalledWith(chatId, today);
     });
 
     it('should not send follow-up reminder if everyone has replied', async () => {
@@ -109,17 +156,11 @@ describe('SchedulerService', () => {
       const today = '2023-12-15';
       const trackedUserIds = [123456789, 987654321];
       
-      // Mock UserService
+      // Mock services
       mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
+      mockReminderService.getReminderCount.mockResolvedValue(1);
       mockUserService.getTrackedUserIdsForChat.mockResolvedValue(trackedUserIds);
-      
-      // Mark all users as replied
-      trackedUserIds.forEach(userId => {
-        stateManager.markUserReplied(chatId, today, userId);
-      });
-      
-      // Set up some reminder count
-      stateManager.incrementReminderCount(chatId, today);
+      mockPlanService.getUnrepliedUserIds.mockResolvedValue([]); // Everyone replied
       
       scheduler.start();
 
@@ -139,17 +180,17 @@ describe('SchedulerService', () => {
       const chatId = -123456789;
       const today = '2023-12-15';
       const trackedUserIds = [123456789, 987654321];
+      const unrepliedUserIds = [987654321];
       
-      // Mock UserService
+      // Mock services
       mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
+      mockReminderService.getReminderCount.mockResolvedValue(1); // 1 reminder already sent
       mockUserService.getTrackedUserIdsForChat.mockResolvedValue(trackedUserIds);
+      mockPlanService.getUnrepliedUserIds.mockResolvedValue(unrepliedUserIds);
       mockUserService.getActiveUsersForChat.mockResolvedValue([
         { telegramId: 987654321, username: 'jane_doe' },
       ]);
-      
-      // Mark only one user as replied
-      stateManager.markUserReplied(chatId, today, 123456789);
-      stateManager.incrementReminderCount(chatId, today); // 1 reminder already sent
+      mockReminderService.incrementReminderCount.mockResolvedValue(2);
       
       scheduler.start();
 
@@ -168,22 +209,22 @@ describe('SchedulerService', () => {
       );
 
       // Verify reminder count was incremented
-      expect(stateManager.getReminderCount(chatId, today)).toBe(2);
+      expect(mockReminderService.incrementReminderCount).toHaveBeenCalledWith(chatId, today);
     });
 
     it('should handle user mention when user not found in database', async () => {
       const chatId = -123456789;
       const today = '2023-12-15';
       const trackedUserIds = [123456789, 987654321];
+      const unrepliedUserIds = [987654321];
       
-      // Mock UserService
+      // Mock services
       mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
+      mockReminderService.getReminderCount.mockResolvedValue(1);
       mockUserService.getTrackedUserIdsForChat.mockResolvedValue(trackedUserIds);
+      mockPlanService.getUnrepliedUserIds.mockResolvedValue(unrepliedUserIds);
       mockUserService.getActiveUsersForChat.mockResolvedValue([]); // No users found
-      
-      // Mark only one user as replied
-      stateManager.markUserReplied(chatId, today, 123456789);
-      stateManager.incrementReminderCount(chatId, today);
+      mockReminderService.incrementReminderCount.mockResolvedValue(2);
       
       scheduler.start();
 
@@ -204,17 +245,10 @@ describe('SchedulerService', () => {
     it('should not send more than 4 reminders per day', async () => {
       const chatId = -123456789;
       const today = '2023-12-15';
-      const trackedUserIds = [123456789, 987654321];
       
-      // Mock UserService
+      // Mock services
       mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
-      mockUserService.getTrackedUserIdsForChat.mockResolvedValue(trackedUserIds);
-      
-      // Set reminder count to maximum
-      stateManager.incrementReminderCount(chatId, today);
-      stateManager.incrementReminderCount(chatId, today);
-      stateManager.incrementReminderCount(chatId, today);
-      stateManager.incrementReminderCount(chatId, today); // 4 reminders sent
+      mockReminderService.getReminderCount.mockResolvedValue(4); // 4 reminders already sent
       
       scheduler.start();
 
@@ -227,13 +261,15 @@ describe('SchedulerService', () => {
 
       // Should not send another reminder
       expect(mockBot.api.sendMessage).not.toHaveBeenCalled();
+      expect(mockUserService.getTrackedUserIdsForChat).not.toHaveBeenCalled();
     });
 
     it('should handle errors gracefully when sending messages', async () => {
       const chatId = -123456789;
       
-      // Mock UserService
+      // Mock services
       mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
+      mockReminderService.getReminderCount.mockResolvedValue(0);
       
       // Mock sendMessage to throw an error
       mockBot.api.sendMessage.mockRejectedValueOnce(new Error('Network error'));
@@ -262,8 +298,10 @@ describe('SchedulerService', () => {
       const chat1 = -123456789;
       const chat2 = -987654321;
       
-      // Mock UserService
+      // Mock services
       mockUserService.getActiveChatIds.mockResolvedValue([chat1, chat2]);
+      mockReminderService.getReminderCount.mockResolvedValue(0);
+      mockReminderService.incrementReminderCount.mockResolvedValue(1);
       
       scheduler.start();
 
