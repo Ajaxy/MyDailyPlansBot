@@ -1,12 +1,7 @@
 import { DataSource } from 'typeorm';
 import * as path from 'path';
 import { env } from './dotenv';
-import {
-  User,
-  Plan,
-  ReminderState,
-  Repository,
-} from '../entities';
+import { Plan, ReminderState, Repository, User } from '../entities';
 
 // Import pg to define custom type parser for bigint
 import { types } from 'pg';
@@ -16,8 +11,8 @@ types.setTypeParser(types.builtins.INT8, (val: string | null) => (val === null ?
 
 const sslConfig = process.env.DATABASE_URL ? {
   ssl: {
-    rejectUnauthorized: false
-  }
+    rejectUnauthorized: false,
+  },
 } : {};
 
 export const AppDataSource = new DataSource({

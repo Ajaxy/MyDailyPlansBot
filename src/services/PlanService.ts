@@ -1,4 +1,4 @@
-import { Repository, DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Plan } from '../entities';
 import { AppDataSource } from '../config/database';
 
@@ -19,7 +19,7 @@ export class PlanService {
     chatId: number,
     date: string,
     messageId: number,
-    messageText: string
+    messageText: string,
   ): Promise<Plan> {
     try {
       const plan = new Plan(userTelegramId, chatId, date, messageId, messageText);
@@ -38,9 +38,9 @@ export class PlanService {
       const plans = await this.planRepository.find({
         where: {
           chatId,
-          date
+          date,
         },
-        select: ['userTelegramId']
+        select: ['userTelegramId'],
       });
 
       // Return unique user IDs since users can have multiple plans per day
@@ -61,8 +61,8 @@ export class PlanService {
         where: {
           userTelegramId,
           chatId,
-          date
-        }
+          date,
+        },
       });
 
       return plan !== null;
@@ -93,11 +93,11 @@ export class PlanService {
       return await this.planRepository.find({
         where: {
           chatId,
-          date
+          date,
         },
         order: {
-          createdAt: 'ASC'
-        }
+          createdAt: 'ASC',
+        },
       });
     } catch (error) {
       console.error('Error getting plans for chat and date:', error);
@@ -113,8 +113,8 @@ export class PlanService {
       return await this.planRepository.count({
         where: {
           chatId,
-          date
-        }
+          date,
+        },
       });
     } catch (error) {
       console.error('Error getting plan count:', error);
@@ -131,8 +131,8 @@ export class PlanService {
         where: {
           userTelegramId,
           chatId,
-          date
-        }
+          date,
+        },
       });
     } catch (error) {
       console.error('Error getting plan:', error);
@@ -147,7 +147,7 @@ export class PlanService {
     try {
       await this.planRepository.delete({
         chatId,
-        date
+        date,
       });
     } catch (error) {
       console.error('Error removing plans for date:', error);

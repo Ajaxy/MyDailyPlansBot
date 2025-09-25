@@ -32,7 +32,7 @@ if (process.env.DATABASE_URL) {
 } else {
   const requiredDbEnvVars = ['DB_HOST', 'DB_PORT', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE'];
   const missingDbEnvVars = requiredDbEnvVars.filter(envVar => !process.env[envVar]);
-  
+
   if (missingDbEnvVars.length) {
     console.error(`Error: Missing database environment variables: ${missingDbEnvVars.join(', ')}`);
     console.error('Provide either DATABASE_URL or all individual DB_ variables');

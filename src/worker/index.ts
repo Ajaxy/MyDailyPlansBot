@@ -17,7 +17,8 @@ import { BotService } from '../services';
 
     // In development mode, listen for manual reminder triggers
     if (process.env.NODE_ENV !== 'production') {
-      console.log('Development mode: Type "remind" or "remind 6" to manually trigger reminders, "remind_pr" for PR reminders, "remind_duty" for duty reminders, or "quit" to exit');
+      console.log(
+        'Development mode: Type "remind" or "remind 6" to manually trigger reminders, "remind_pr" for PR reminders, "remind_duty" for duty reminders, or "quit" to exit');
 
       process.stdin.setEncoding('utf8');
       process.stdin.on('readable', () => {
@@ -52,7 +53,8 @@ import { BotService } from '../services';
             console.log('Exiting...');
             process.exit(0);
           } else if (input) {
-            console.log('Commands: "remind" (follow-up), "remind 6" (initial), "remind_pr" (PR reminders), "remind_duty" (duty reminders), "quit" to exit.');
+            console.log(
+              'Commands: "remind" (follow-up), "remind 6" (initial), "remind_pr" (PR reminders), "remind_duty" (duty reminders), "quit" to exit.');
           }
         }
       });

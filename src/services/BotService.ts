@@ -1,4 +1,4 @@
-import { Bot, Context, GrammyError, HttpError } from 'grammy';
+import { Bot, GrammyError, HttpError } from 'grammy';
 import { SchedulerService } from './SchedulerService';
 import { UserService } from './UserService';
 import { PlanService } from './PlanService';
@@ -23,10 +23,91 @@ export class BotService {
     this.reminderService = new ReminderService();
     this.userService = new UserService();
     this.dutyReminderService = new DutyReminderService(this.bot, this.userService);
-    this.scheduler = new SchedulerService(this.bot, this.planService, this.reminderService, this.userService, this.dutyReminderService);
+    this.scheduler = new SchedulerService(this.bot,
+      this.planService,
+      this.reminderService,
+      this.userService,
+      this.dutyReminderService);
 
     this.setupHandlers();
     this.setupErrorHandling();
+  }
+
+  public async start(): Promise<void> {
+    console.log('Starting MyDailyPlans bot...');
+
+    try {
+      const activeChatIds = await this.userService.getActiveChatIds();
+      console.log(`Active chats configured: ${activeChatIds.join(', ')}`);
+    } catch (error) {
+      console.log('No active chats found in database');
+    }
+
+    // Start the scheduler
+    this.scheduler.start();
+
+    // Start the bot
+    await this.bot.start();
+    console.log('MyDailyPlans bot started successfully');
+  }
+
+  public async stop(): Promise<void> {
+    console.log('Stopping MyDailyPlans bot...');
+    await this.bot.stop();
+    console.log('MyDailyPlans bot stopped');
+  }
+
+  // For testing purposes
+  public getBot(): Bot {
+    return this.bot;
+  }
+
+  public getPlanService(): PlanService {
+    return this.planService;
+  }
+
+  public getReminderService(): ReminderService {
+    return this.reminderService;
+  }
+
+  public getScheduler(): SchedulerService {
+    return this.scheduler;
+  }
+
+  public getUserService(): UserService {
+    return this.userService;
+  }
+
+  // For manual reminder triggering in development
+  public async triggerReminder(hour?: number): Promise<void> {
+    console.log('Manually triggering reminders...');
+    const scheduler = this.getScheduler();
+
+    // Use provided hour or current time to determine reminder type
+    const targetHour = hour !== undefined ? hour : new Date().getHours();
+
+    if (targetHour === 6) {
+      // Trigger initial reminder
+      console.log('Triggering initial reminder (6 AM type)');
+      await scheduler.sendInitialReminder();
+    } else {
+      // Trigger follow-up reminder
+      console.log('Triggering follow-up reminder');
+      await scheduler.sendFollowUpReminder();
+    }
+  }
+
+  // For manual PR reminder triggering in development
+  public async triggerPrReminder(): Promise<void> {
+    console.log('Manually triggering PR reminders...');
+    const scheduler = this.getScheduler();
+    await scheduler.sendPrReminders();
+  }
+
+  // For manual duty reminder triggering in development
+  public async triggerDutyReminder(): Promise<void> {
+    console.log('Manually triggering duty reminders...');
+    await this.dutyReminderService.sendDutyReminders();
   }
 
   private setupHandlers(): void {
@@ -45,7 +126,7 @@ export class BotService {
           '\n/status - Проверить статус ответов' +
           '\n/remind_pr - Отправить напоминания о PR' +
           '\n/help - Показать справку',
-          { parse_mode: 'Markdown' }
+          { parse_mode: 'Markdown' },
         );
       } else if (chatMember.new_chat_member.status === 'left' || chatMember.new_chat_member.status === 'kicked') {
         console.log(`Bot removed from chat: ${chat.id}`);
@@ -67,7 +148,7 @@ export class BotService {
         if (trackedUsers.length === 0) {
           await ctx.reply(
             '⚠️ В этом чате нет отслеживаемых пользователей.\n\n' +
-            'Обратитесь к администратору для настройки отслеживания участников команды.'
+            'Обратитесь к администратору для настройки отслеживания участников команды.',
           );
           return;
         }
@@ -106,11 +187,11 @@ export class BotService {
 
       try {
         await ctx.reply('🔄 Проверяю PR для этого чата...');
-        
+
         // Send PR reminder only for this specific chat
         const prReminderService = this.scheduler.getPrReminderService();
         await prReminderService.sendPrReminderToChat(chatId);
-        
+
         // Note: Success/no PRs message will be sent by the PR reminder service itself
       } catch (error) {
         console.error('Error sending PR reminders:', error);
@@ -126,7 +207,7 @@ export class BotService {
       }
 
       const chatId = ctx.chat.id;
-      
+
       // Only allow in the specific duty chat
       if (chatId !== -1001783045675) {
         await ctx.reply('Напоминания о дежурстве доступны только в специальном чате.');
@@ -135,10 +216,10 @@ export class BotService {
 
       try {
         await ctx.reply('🔄 Проверяю дежурство на сегодня...');
-        
+
         // Send duty reminder only for this specific chat
         await this.dutyReminderService.sendDutyReminderToChat(chatId);
-        
+
       } catch (error) {
         console.error('Error sending duty reminder:', error);
         await ctx.reply('❌ Ошибка при отправке напоминания о дежурстве.');
@@ -238,82 +319,5 @@ export class BotService {
 
   private getCurrentDate(): string {
     return new Date().toISOString().split('T')[0];
-  }
-
-  public async start(): Promise<void> {
-    console.log('Starting MyDailyPlans bot...');
-
-    try {
-      const activeChatIds = await this.userService.getActiveChatIds();
-      console.log(`Active chats configured: ${activeChatIds.join(', ')}`);
-    } catch (error) {
-      console.log('No active chats found in database');
-    }
-
-    // Start the scheduler
-    this.scheduler.start();
-
-    // Start the bot
-    await this.bot.start();
-    console.log('MyDailyPlans bot started successfully');
-  }
-
-  public async stop(): Promise<void> {
-    console.log('Stopping MyDailyPlans bot...');
-    await this.bot.stop();
-    console.log('MyDailyPlans bot stopped');
-  }
-
-  // For testing purposes
-  public getBot(): Bot {
-    return this.bot;
-  }
-
-  public getPlanService(): PlanService {
-    return this.planService;
-  }
-
-  public getReminderService(): ReminderService {
-    return this.reminderService;
-  }
-
-  public getScheduler(): SchedulerService {
-    return this.scheduler;
-  }
-
-  public getUserService(): UserService {
-    return this.userService;
-  }
-
-  // For manual reminder triggering in development
-  public async triggerReminder(hour?: number): Promise<void> {
-    console.log('Manually triggering reminders...');
-    const scheduler = this.getScheduler();
-
-    // Use provided hour or current time to determine reminder type
-    const targetHour = hour !== undefined ? hour : new Date().getHours();
-
-    if (targetHour === 6) {
-      // Trigger initial reminder
-      console.log('Triggering initial reminder (6 AM type)');
-      await scheduler.sendInitialReminder();
-    } else {
-      // Trigger follow-up reminder
-      console.log('Triggering follow-up reminder');
-      await scheduler.sendFollowUpReminder();
-    }
-  }
-
-  // For manual PR reminder triggering in development
-  public async triggerPrReminder(): Promise<void> {
-    console.log('Manually triggering PR reminders...');
-    const scheduler = this.getScheduler();
-    await scheduler.sendPrReminders();
-  }
-
-  // For manual duty reminder triggering in development
-  public async triggerDutyReminder(): Promise<void> {
-    console.log('Manually triggering duty reminders...');
-    await this.dutyReminderService.sendDutyReminders();
   }
 } 

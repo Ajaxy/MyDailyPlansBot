@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, Index, CreateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('plans')
 @Index(['chatId', 'date']) // Index for querying plans by chat and date
@@ -30,7 +30,7 @@ export class Plan {
     chatId?: number,
     date?: string,
     messageId?: number,
-    messageText?: string
+    messageText?: string,
   ) {
     if (userTelegramId !== undefined) {
       this.userTelegramId = userTelegramId;

@@ -68,7 +68,7 @@ export class UserService {
   async deactivateUser(telegramId: number, chatId: number): Promise<void> {
     await this.userRepository.update(
       { telegramId, chatId },
-      { isActive: false }
+      { isActive: false },
     );
   }
 

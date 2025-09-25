@@ -7,7 +7,6 @@ import { GitHubService } from './GitHubService';
 import { PrReminderService } from './PrReminderService';
 import { RepositoryService } from './RepositoryService';
 import { DutyReminderService } from './DutyReminderService';
-import { REMINDER_SCHEDULE, WORKING_DAYS } from '../types';
 import { User } from '../entities';
 
 export class SchedulerService {
@@ -18,13 +17,17 @@ export class SchedulerService {
   private prReminderService: PrReminderService;
   private dutyReminderService: DutyReminderService;
 
-  constructor(bot: Bot, planService: PlanService, reminderService: ReminderService, userService: UserService, dutyReminderService: DutyReminderService) {
+  constructor(bot: Bot,
+    planService: PlanService,
+    reminderService: ReminderService,
+    userService: UserService,
+    dutyReminderService: DutyReminderService) {
     this.bot = bot;
     this.planService = planService;
     this.reminderService = reminderService;
     this.userService = userService;
     this.dutyReminderService = dutyReminderService;
-    
+
     // Initialize GitHub and PR reminder services
     const repositoryService = new RepositoryService();
     const githubService = new GitHubService(repositoryService);
@@ -36,28 +39,28 @@ export class SchedulerService {
     cron.schedule('0 6 * * 1-5', async () => {
       await this.sendInitialReminder();
     }, {
-      timezone: 'GMT'
+      timezone: 'GMT',
     });
 
     // Follow-up reminders every 3 hours: 9:00, 12:00, 15:00 GMT
     cron.schedule('0 9,12,15 * * 1-5', async () => {
       await this.sendFollowUpReminder();
     }, {
-      timezone: 'GMT'
+      timezone: 'GMT',
     });
 
     // PR reminders at 10:00 and 16:00 GMT every day
     cron.schedule('0 10,16 * * *', async () => {
       await this.sendPrReminders();
     }, {
-      timezone: 'GMT'
+      timezone: 'GMT',
     });
 
     // Duty reminders at 12:00 AM (00:00) GMT every day
     cron.schedule('0 0 * * *', async () => {
       await this.sendDutyReminders();
     }, {
-      timezone: 'GMT'
+      timezone: 'GMT',
     });
 
     console.log('Daily plan reminder scheduler started');
@@ -65,14 +68,9 @@ export class SchedulerService {
     console.log('Duty reminder scheduler started (12:00 AM GMT daily)');
   }
 
-  private getCurrentDate(): string {
-    const now = new Date();
-    return now.toISOString().split('T')[0]; // YYYY-MM-DD format
-  }
-
   public async sendInitialReminder(): Promise<void> {
     const date = this.getCurrentDate();
-    
+
     try {
       const activeChatIds = await this.userService.getActiveChatIds();
 
@@ -136,33 +134,6 @@ export class SchedulerService {
     }
   }
 
-  private getInitialReminderMessage(): string {
-    return '🌅 Всем доброе утро! Пожалуйста, поделитесь своими планами на день.';
-  }
-
-  private escapeMarkdown(text: string): string {
-    // Escape underscores in usernames for Markdown
-    return text.replace(/_/g, '\\_');
-  }
-
-  private async getFollowUpReminderMessage(chatId: number, unrepliedUserIds: number[]): Promise<string> {
-    const mentions: string[] = [];
-    const activeUsers = await this.userService.getActiveUsersForChat(chatId);
-    
-    for (const userId of unrepliedUserIds) {
-      const user = activeUsers.find((u: User) => u.telegramId === userId);
-      if (user) {
-        const escapedUsername = this.escapeMarkdown(user.username);
-        mentions.push(`@${escapedUsername}`);
-      } else {
-        mentions.push(`[Пользователь ${userId}](tg://user?id=${userId})`);
-      }
-    }
-
-    const mentionText = mentions.join(', ');
-    return `⏰ Дружеское напоминание: ${mentionText}, пожалуйста, не забудьте поделиться своими планами на день!`;
-  }
-
   // For testing/manual triggering
   public async getActiveChatIds(): Promise<number[]> {
     return this.userService.getActiveChatIds();
@@ -193,5 +164,37 @@ export class SchedulerService {
     } catch (error) {
       console.error('Error in scheduled duty reminders:', error);
     }
+  }
+
+  private getCurrentDate(): string {
+    const now = new Date();
+    return now.toISOString().split('T')[0]; // YYYY-MM-DD format
+  }
+
+  private getInitialReminderMessage(): string {
+    return '🌅 Всем доброе утро! Пожалуйста, поделитесь своими планами на день.';
+  }
+
+  private escapeMarkdown(text: string): string {
+    // Escape underscores in usernames for Markdown
+    return text.replace(/_/g, '\\_');
+  }
+
+  private async getFollowUpReminderMessage(chatId: number, unrepliedUserIds: number[]): Promise<string> {
+    const mentions: string[] = [];
+    const activeUsers = await this.userService.getActiveUsersForChat(chatId);
+
+    for (const userId of unrepliedUserIds) {
+      const user = activeUsers.find((u: User) => u.telegramId === userId);
+      if (user) {
+        const escapedUsername = this.escapeMarkdown(user.username);
+        mentions.push(`@${escapedUsername}`);
+      } else {
+        mentions.push(`[Пользователь ${userId}](tg://user?id=${userId})`);
+      }
+    }
+
+    const mentionText = mentions.join(', ');
+    return `⏰ Дружеское напоминание: ${mentionText}, пожалуйста, не забудьте поделиться своими планами на день!`;
   }
 } 

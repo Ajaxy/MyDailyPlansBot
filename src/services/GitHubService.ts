@@ -1,5 +1,4 @@
 import { RepositoryService } from './RepositoryService';
-import { Repository } from '../entities';
 
 interface GitHubPr {
   number: number;
@@ -36,50 +35,6 @@ export class GitHubService {
   }
 
   /**
-   * Fetch all open PRs from repositories configured for a specific chat
-   */
-  private async fetchOpenPrs(chatId: number): Promise<GitHubPr[]> {
-    const allPrs: GitHubPr[] = [];
-
-    const repositories = await this.repositoryService.getActiveRepositoriesForChat(chatId);
-    
-    if (repositories.length === 0) {
-      console.log(`No repositories configured for chat ${chatId}`);
-      return [];
-    }
-
-    for (const repo of repositories) {
-      try {
-        if (!repo.ghToken) {
-          console.log(`No GitHub token configured for repository ${repo.fullName}, skipping`);
-          continue;
-        }
-
-        const headers = {
-          'Authorization': `Bearer ${repo.ghToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'X-GitHub-Api-Version': '2022-11-28'
-        };
-
-        const url = `https://api.github.com/repos/${repo.fullName}/pulls?state=open&per_page=100`;
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) {
-          console.error(`Failed to fetch PRs from ${repo.fullName}: ${response.status} ${response.statusText}`);
-          continue;
-        }
-
-        const prs = await response.json() as GitHubPr[];
-        allPrs.push(...prs);
-      } catch (error) {
-        console.error(`Error fetching PRs from ${repo.fullName}:`, error);
-      }
-    }
-
-    return allPrs;
-  }
-
-  /**
    * Get PRs assigned to specific GitHub usernames for a specific chat
    */
   public async getAssignedPrs(githubUsernames: string[], chatId: number): Promise<Map<string, UserPrs>> {
@@ -89,7 +44,7 @@ export class GitHubService {
     githubUsernames.forEach(username => {
       prsByUser.set(username, {
         githubUsername: username,
-        prs: []
+        prs: [],
       });
     });
 
@@ -109,7 +64,7 @@ export class GitHubService {
 
         // Check assignees (GitHub PRs can have multiple assignees)
         const assignees = pr.assignees || (pr.assignee ? [pr.assignee] : []);
-        
+
         for (const assignee of assignees) {
           // Case-insensitive username matching
           const originalUsername = usernameLowerMap.get(assignee.login.toLowerCase());
@@ -119,7 +74,7 @@ export class GitHubService {
               number: pr.number,
               title: pr.title,
               url: pr.html_url,
-              repo: repoName
+              repo: repoName,
             });
           }
         }
@@ -129,5 +84,49 @@ export class GitHubService {
     }
 
     return prsByUser;
+  }
+
+  /**
+   * Fetch all open PRs from repositories configured for a specific chat
+   */
+  private async fetchOpenPrs(chatId: number): Promise<GitHubPr[]> {
+    const allPrs: GitHubPr[] = [];
+
+    const repositories = await this.repositoryService.getActiveRepositoriesForChat(chatId);
+
+    if (repositories.length === 0) {
+      console.log(`No repositories configured for chat ${chatId}`);
+      return [];
+    }
+
+    for (const repo of repositories) {
+      try {
+        if (!repo.ghToken) {
+          console.log(`No GitHub token configured for repository ${repo.fullName}, skipping`);
+          continue;
+        }
+
+        const headers = {
+          'Authorization': `Bearer ${repo.ghToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        };
+
+        const url = `https://api.github.com/repos/${repo.fullName}/pulls?state=open&per_page=100`;
+        const response = await fetch(url, { headers });
+
+        if (!response.ok) {
+          console.error(`Failed to fetch PRs from ${repo.fullName}: ${response.status} ${response.statusText}`);
+          continue;
+        }
+
+        const prs = await response.json() as GitHubPr[];
+        allPrs.push(...prs);
+      } catch (error) {
+        console.error(`Error fetching PRs from ${repo.fullName}:`, error);
+      }
+    }
+
+    return allPrs;
   }
 }

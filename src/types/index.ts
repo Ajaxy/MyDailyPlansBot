@@ -13,7 +13,7 @@ export const REMINDER_SCHEDULE: ReminderTimes = {
   initial: '06:00',
   followUp1: '09:00',
   followUp2: '12:00',
-  followUp3: '15:00'
+  followUp3: '15:00',
 };
 
 export const WORKING_DAYS = [1, 2, 3, 4, 5]; // Monday to Friday

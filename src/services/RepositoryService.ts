@@ -1,4 +1,4 @@
-import { Repository as TypeOrmRepository, DataSource } from 'typeorm';
+import { DataSource, Repository as TypeOrmRepository } from 'typeorm';
 import { Repository } from '../entities';
 import { AppDataSource } from '../config/database';
 
@@ -15,7 +15,7 @@ export class RepositoryService {
     try {
       const repositories = await this.repositoryRepository.find({
         where: { chatId, isActive: true },
-        order: { fullName: 'ASC' }
+        order: { fullName: 'ASC' },
       });
 
       return repositories;

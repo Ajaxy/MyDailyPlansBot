@@ -1,4 +1,4 @@
-import { Entity, Column, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { Column, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity('reminder_states')
 @Index(['chatId', 'date'], { unique: true }) // Unique constraint: one reminder state per chat per date
@@ -21,7 +21,7 @@ export class ReminderState {
   constructor(
     chatId?: number,
     date?: string,
-    reminderCount?: number
+    reminderCount?: number,
   ) {
     if (chatId !== undefined && date !== undefined) {
       this.id = `${chatId}_${date}`;

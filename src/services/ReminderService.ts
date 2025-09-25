@@ -1,4 +1,4 @@
-import { Repository, DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ReminderState } from '../entities';
 import { AppDataSource } from '../config/database';
 
@@ -11,19 +11,15 @@ export class ReminderService {
     this.reminderStateRepository = this.dataSource.getRepository(ReminderState);
   }
 
-  private getStateId(chatId: number, date: string): string {
-    return `${chatId}_${date}`;
-  }
-
   /**
    * Get or create reminder state for a chat and date
    */
   public async getOrCreateReminderState(chatId: number, date: string): Promise<ReminderState> {
     try {
       const stateId = this.getStateId(chatId, date);
-      
+
       let reminderState = await this.reminderStateRepository.findOne({
-        where: { id: stateId }
+        where: { id: stateId },
       });
 
       if (!reminderState) {
@@ -45,7 +41,7 @@ export class ReminderService {
     try {
       const reminderState = await this.getOrCreateReminderState(chatId, date);
       reminderState.reminderCount += 1;
-      
+
       const updatedState = await this.reminderStateRepository.save(reminderState);
       return updatedState.reminderCount;
     } catch (error) {
@@ -86,7 +82,7 @@ export class ReminderService {
   public async getLastReminderTime(chatId: number, date: string): Promise<Date | null> {
     try {
       const reminderState = await this.reminderStateRepository.findOne({
-        where: { id: this.getStateId(chatId, date) }
+        where: { id: this.getStateId(chatId, date) },
       });
 
       return reminderState?.lastReminderTime || null;
@@ -94,5 +90,9 @@ export class ReminderService {
       console.error('Error getting last reminder time:', error);
       throw error;
     }
+  }
+
+  private getStateId(chatId: number, date: string): string {
+    return `${chatId}_${date}`;
   }
 } 

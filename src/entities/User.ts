@@ -1,4 +1,4 @@
-import { Entity, PrimaryColumn, Column, Index } from 'typeorm';
+import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 
 @Entity('users')
 @Index(['chatId']) // Add index for chatId for better query performance
@@ -27,7 +27,7 @@ export class User {
     username?: string,
     isActive?: boolean,
     githubUsername?: string,
-    notionUsername?: string
+    notionUsername?: string,
   ) {
     if (telegramId !== undefined) {
       this.telegramId = telegramId;

@@ -57,8 +57,8 @@ export class PrReminderService {
       const message = this.buildPrReminderMessage(usersWithGitHub, prsByUser);
 
       if (message) {
-        await this.bot.api.sendMessage(chatId, message, { 
-          parse_mode: 'HTML'
+        await this.bot.api.sendMessage(chatId, message, {
+          parse_mode: 'HTML',
         });
         console.log(`Sent PR reminder to chat ${chatId}`);
       } else {
@@ -73,8 +73,11 @@ export class PrReminderService {
    * Build PR reminder message
    */
   private buildPrReminderMessage(
-    users: User[], 
-    prsByUser: Map<string, { githubUsername: string; prs: Array<{ number: number; title: string; url: string; repo: string }> }>
+    users: User[],
+    prsByUser: Map<string, {
+      githubUsername: string;
+      prs: Array<{ number: number; title: string; url: string; repo: string }>
+    }>,
   ): string | null {
     const userMessages: string[] = [];
 
@@ -84,14 +87,14 @@ export class PrReminderService {
         // Escape HTML characters in username
         const escapedUsername = this.escapeHtml(user.username);
         let userMessage = `\n\n👤 <b>@${escapedUsername}</b>`;
-        
+
         for (const pr of userPrs.prs) {
           // Escape HTML characters in PR title
           const escapedTitle = this.escapeHtml(pr.title);
           const prLink = `<a href="${pr.url}">#${pr.number}</a>`;
           userMessage += `\n• ${prLink} - ${escapedTitle} (${pr.repo})`;
         }
-        
+
         userMessages.push(userMessage);
       }
     }
@@ -114,7 +117,7 @@ export class PrReminderService {
       '<': '&lt;',
       '>': '&gt;',
       '"': '&quot;',
-      "'": '&#39;'
+      '\'': '&#39;',
     };
     return text.replace(/[&<>"']/g, (match) => htmlEntities[match]);
   }
