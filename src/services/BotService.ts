@@ -1,12 +1,15 @@
 import { Bot, GrammyError, HttpError } from 'grammy';
-import { SchedulerService } from './SchedulerService';
-import { UserService } from './UserService';
-import { PlanService } from './PlanService';
-import { ReminderService } from './ReminderService';
+
+import type { BotConfig } from '../types';
+
+import type { User } from '../entities';
+
 import { DutyReminderService } from './DutyReminderService';
 import { OffService } from './OffService';
-import { BotConfig } from '../types';
-import { User } from '../entities';
+import { PlanService } from './PlanService';
+import { ReminderService } from './ReminderService';
+import { SchedulerService } from './SchedulerService';
+import { UserService } from './UserService';
 
 export class BotService {
   private bot: Bot;
@@ -16,10 +19,8 @@ export class BotService {
   private userService: UserService;
   private dutyReminderService: DutyReminderService;
   private offService: OffService;
-  private config: BotConfig;
 
   constructor(config: BotConfig) {
-    this.config = config;
     this.bot = new Bot(config.token);
     this.planService = new PlanService();
     this.reminderService = new ReminderService();
@@ -123,12 +124,12 @@ export class BotService {
         console.log(`Bot added to chat: ${chat.id} (${chat.title || 'Private chat'})`);
 
         await ctx.reply(
-          '👋 Привет! Я бот *MyDailyPlans*, помогаю всем быть в курсе ежедневных планов команды.' +
-          '\n\nБуду напоминать рассказывать о планах на день: в рабочие дни в 6:00 GMT, с несколькими повторениями до 15:00 GMT.' +
-          '\n\n*Команды:*' +
-          '\n/status - Проверить статус ответов' +
-          '\n/remind_pr - Отправить напоминания о PR' +
-          '\n/help - Показать справку',
+          '👋 Привет! Я бот *MyDailyPlans*, помогаю всем быть в курсе ежедневных планов команды.'
+          + '\n\nБуду напоминать рассказывать о планах на день: в рабочие дни в 6:00 GMT, с несколькими повторениями до 15:00 GMT.'
+          + '\n\n*Команды:*'
+          + '\n/status - Проверить статус ответов'
+          + '\n/remind_pr - Отправить напоминания о PR'
+          + '\n/help - Показать справку',
           { parse_mode: 'Markdown' },
         );
       } else if (chatMember.new_chat_member.status === 'left' || chatMember.new_chat_member.status === 'kicked') {
@@ -150,8 +151,8 @@ export class BotService {
 
         if (trackedUsers.length === 0) {
           await ctx.reply(
-            '⚠️ В этом чате нет отслеживаемых пользователей.\n\n' +
-            'Обратитесь к администратору для настройки отслеживания участников команды.',
+            '⚠️ В этом чате нет отслеживаемых пользователей.\n\n'
+            + 'Обратитесь к администратору для настройки отслеживания участников команды.',
           );
           return;
         }
@@ -222,7 +223,6 @@ export class BotService {
 
         // Send duty reminder only for this specific chat
         await this.dutyReminderService.sendDutyReminderToChat(chatId);
-
       } catch (error) {
         console.error('Error sending duty reminder:', error);
         await ctx.reply('❌ Ошибка при отправке напоминания о дежурстве.');
@@ -279,8 +279,8 @@ export class BotService {
           toDate.setHours(0, 0, 0, 0);
         } else if (dateRange.includes('-')) {
           // Date range specified
-          const [fromStr, toStr] = dateRange.split('-').map(s => s.trim());
-          
+          const [fromStr, toStr] = dateRange.split('-').map((s) => s.trim());
+
           if (!fromStr || fromStr === '') {
             // Only end date specified, start from today
             fromDate = new Date();
@@ -328,13 +328,12 @@ export class BotService {
         // Format dates for display
         const fromStr = this.formatDate(fromDate);
         const toStr = this.formatDate(toDate);
-        
+
         if (fromStr === toStr) {
           await ctx.reply(`✅ Добавлено отсутствие для @${username} на ${fromStr}`);
         } else {
           await ctx.reply(`✅ Добавлено отсутствие для @${username} с ${fromStr} по ${toStr}`);
         }
-
       } catch (error) {
         console.error('Error handling /off command:', error);
         await ctx.reply('❌ Произошла ошибка при добавлении отсутствия.');
@@ -443,38 +442,38 @@ export class BotService {
   private parseDate(dateStr: string): Date | null {
     // Remove any whitespace
     dateStr = dateStr.trim();
-    
+
     // Split by dots
     const parts = dateStr.split('.');
-    
+
     if (parts.length < 2 || parts.length > 3) {
       return null;
     }
-    
+
     const day = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10);
     const year = parts.length === 3 ? parseInt(parts[2], 10) : new Date().getFullYear();
-    
+
     // Validate values
     if (isNaN(day) || isNaN(month) || isNaN(year)) {
       return null;
     }
-    
+
     if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > 2100) {
       return null;
     }
-    
+
     // Create date (month is 0-indexed in JavaScript)
     const date = new Date(year, month - 1, day);
-    
+
     // Check if the date is valid (e.g., not Feb 31)
     if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
       return null;
     }
-    
+
     // Set time to start of day
     date.setHours(0, 0, 0, 0);
-    
+
     return date;
   }
 
@@ -487,4 +486,4 @@ export class BotService {
     const year = date.getFullYear();
     return `${day}.${month}.${year}`;
   }
-} 
+}

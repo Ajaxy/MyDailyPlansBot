@@ -1,4 +1,4 @@
-import { RepositoryService } from './RepositoryService';
+import type { RepositoryService } from './RepositoryService';
 
 interface GitHubPr {
   number: number;
@@ -41,7 +41,7 @@ export class GitHubService {
     const prsByUser = new Map<string, UserPrs>();
 
     // Initialize map with empty arrays for each user
-    githubUsernames.forEach(username => {
+    githubUsernames.forEach((username) => {
       prsByUser.set(username, {
         githubUsername: username,
         prs: [],
@@ -50,7 +50,7 @@ export class GitHubService {
 
     // Create a lowercase mapping for case-insensitive matching
     const usernameLowerMap = new Map<string, string>();
-    githubUsernames.forEach(username => {
+    githubUsernames.forEach((username) => {
       usernameLowerMap.set(username.toLowerCase(), username);
     });
 
@@ -107,8 +107,8 @@ export class GitHubService {
         }
 
         const headers = {
-          'Authorization': `Bearer ${repo.ghToken}`,
-          'Accept': 'application/vnd.github.v3+json',
+          Authorization: `Bearer ${repo.ghToken}`,
+          Accept: 'application/vnd.github.v3+json',
           'X-GitHub-Api-Version': '2022-11-28',
         };
 

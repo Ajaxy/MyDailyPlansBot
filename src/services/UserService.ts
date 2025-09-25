@@ -1,6 +1,7 @@
-import { Repository } from 'typeorm';
+import type { Repository } from 'typeorm';
+
 import { AppDataSource } from '../config/database';
-import { User, Off } from '../entities';
+import { Off, User } from '../entities';
 
 export class UserService {
   private userRepository: Repository<User>;
@@ -29,7 +30,7 @@ export class UserService {
 
     for (const user of activeUsers) {
       const isOff = await this.isUserOffOnDate(user.id, chatId, today);
-      
+
       if (!isOff) {
         activeUsersNotOff.push(user);
       }
@@ -48,7 +49,7 @@ export class UserService {
       .where('user.isActive = :isActive', { isActive: true })
       .getRawMany();
 
-    return result.map(row => parseInt(row.chatId, 10));
+    return result.map((row) => parseInt(row.chatId, 10));
   }
 
   /**
@@ -56,7 +57,7 @@ export class UserService {
    */
   async getTrackedUserIdsForChat(chatId: number): Promise<number[]> {
     const users = await this.getActiveUsersForChat(chatId);
-    return users.map(user => user.telegramId);
+    return users.map((user) => user.telegramId);
   }
 
   /**
@@ -105,7 +106,7 @@ export class UserService {
     const user = await this.userRepository.findOne({
       where: { telegramId, chatId, isActive: true },
     });
-    
+
     if (!user) {
       return false;
     }
@@ -113,9 +114,9 @@ export class UserService {
     // Check if user is off today
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const isOff = await this.isUserOffOnDate(user.id, chatId, today);
-    
+
     return !isOff;
   }
 
@@ -145,7 +146,7 @@ export class UserService {
       .andWhere('off.from <= :date', { date })
       .andWhere('off.to >= :date', { date })
       .getCount();
-    
+
     return offCount > 0;
   }
-} 
+}

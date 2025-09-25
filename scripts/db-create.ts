@@ -1,7 +1,8 @@
 import { spawn } from 'child_process';
-import path from 'path';
 import dotenv from 'dotenv';
+import path from 'path';
 import { Client } from 'pg';
+
 import { env } from '../src/config/dotenv';
 
 // Load environment variables from .env file if it exists
@@ -72,7 +73,7 @@ async function setupDatabase(): Promise<void> {
       }
 
       // Create the database
-      const dbName = DB_DATABASE.replace(/'/g, "''"); // Escape single quotes
+      const dbName = DB_DATABASE.replace(/'/g, '\'\''); // Escape single quotes
       await client.query(`CREATE DATABASE "${dbName}"`);
       console.log(`Database "${DB_DATABASE}" created successfully.`);
 
@@ -87,7 +88,7 @@ async function setupDatabase(): Promise<void> {
 
       if (checkResult.rows.length === 0) {
         // Database doesn't exist, create it
-        const dbName = DB_DATABASE.replace(/'/g, "''"); // Escape single quotes
+        const dbName = DB_DATABASE.replace(/'/g, '\'\''); // Escape single quotes
         await client.query(`CREATE DATABASE "${dbName}"`);
         console.log(`Database "${DB_DATABASE}" created successfully.`);
 

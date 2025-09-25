@@ -52,4 +52,4 @@ export class User {
       this.notionUsername = notionUsername;
     }
   }
-} 
+}

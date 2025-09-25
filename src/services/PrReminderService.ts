@@ -1,7 +1,9 @@
-import { Bot } from 'grammy';
-import { GitHubService } from './GitHubService';
-import { UserService } from './UserService';
-import { User } from '../entities';
+import type { Bot } from 'grammy';
+
+import type { User } from '../entities';
+
+import type { GitHubService } from './GitHubService';
+import type { UserService } from './UserService';
 
 export class PrReminderService {
   private bot: Bot;
@@ -76,7 +78,7 @@ export class PrReminderService {
     users: User[],
     prsByUser: Map<string, {
       githubUsername: string;
-      prs: Array<{ number: number; title: string; url: string; repo: string }>
+      prs: Array<{ number: number; title: string; url: string; repo: string }>;
     }>,
   ): string | null {
     const userMessages: string[] = [];

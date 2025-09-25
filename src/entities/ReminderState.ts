@@ -32,4 +32,4 @@ export class ReminderState {
       this.reminderCount = reminderCount;
     }
   }
-} 
+}

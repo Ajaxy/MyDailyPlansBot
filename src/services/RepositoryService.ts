@@ -1,6 +1,7 @@
-import { DataSource, Repository as TypeOrmRepository } from 'typeorm';
-import { Repository } from '../entities';
+import type { DataSource, Repository as TypeOrmRepository } from 'typeorm';
+
 import { AppDataSource } from '../config/database';
+import { Repository } from '../entities';
 
 export class RepositoryService {
   private repositoryRepository: TypeOrmRepository<Repository>;

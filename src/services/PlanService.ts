@@ -1,6 +1,7 @@
-import { DataSource, Repository } from 'typeorm';
-import { Plan } from '../entities';
+import type { DataSource, Repository } from 'typeorm';
+
 import { AppDataSource } from '../config/database';
+import { Plan } from '../entities';
 
 export class PlanService {
   private planRepository: Repository<Plan>;
@@ -44,7 +45,7 @@ export class PlanService {
       });
 
       // Return unique user IDs since users can have multiple plans per day
-      const uniqueUserIds = [...new Set(plans.map(plan => plan.userTelegramId))];
+      const uniqueUserIds = [...new Set(plans.map((plan) => plan.userTelegramId))];
       return uniqueUserIds;
     } catch (error) {
       console.error('Error getting replied user IDs:', error);
@@ -78,7 +79,7 @@ export class PlanService {
   public async getUnrepliedUserIds(chatId: number, date: string, trackedUserIds: number[]): Promise<number[]> {
     try {
       const repliedUserIds = await this.getRepliedUserIds(chatId, date);
-      return trackedUserIds.filter(userId => !repliedUserIds.includes(userId));
+      return trackedUserIds.filter((userId) => !repliedUserIds.includes(userId));
     } catch (error) {
       console.error('Error getting unreplied user IDs:', error);
       throw error;
@@ -154,4 +155,4 @@ export class PlanService {
       throw error;
     }
   }
-} 
+}

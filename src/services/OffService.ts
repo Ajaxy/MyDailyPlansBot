@@ -1,6 +1,7 @@
+import type { Repository } from 'typeorm';
+
 import { AppDataSource } from '../config/database';
 import { Off } from '../entities';
-import { Repository } from 'typeorm';
 
 export class OffService {
   private offRepository: Repository<Off>;
@@ -88,6 +89,6 @@ export class OffService {
       .andWhere('off.to >= :date', { date: checkDate })
       .getMany();
 
-    return offs.map(off => off.userId);
+    return offs.map((off) => off.userId);
   }
 }

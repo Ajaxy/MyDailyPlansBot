@@ -31,7 +31,7 @@ if (process.env.DATABASE_URL) {
   databaseConfig = parseDatabaseUrl(process.env.DATABASE_URL);
 } else {
   const requiredDbEnvVars = ['DB_HOST', 'DB_PORT', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE'];
-  const missingDbEnvVars = requiredDbEnvVars.filter(envVar => !process.env[envVar]);
+  const missingDbEnvVars = requiredDbEnvVars.filter((envVar) => !process.env[envVar]);
 
   if (missingDbEnvVars.length) {
     console.error(`Error: Missing database environment variables: ${missingDbEnvVars.join(', ')}`);
@@ -48,7 +48,7 @@ if (process.env.DATABASE_URL) {
 }
 
 const requiredEnvVars = ['TELEGRAM_BOT_TOKEN'];
-const missingRequiredEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+const missingRequiredEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 if (missingRequiredEnvVars.length) {
   console.error(`Error: Missing environment variables: ${missingRequiredEnvVars.join(', ')}`);
 }

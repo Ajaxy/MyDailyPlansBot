@@ -1,13 +1,15 @@
+import type { Bot } from 'grammy';
 import * as cron from 'node-cron';
-import { Bot } from 'grammy';
-import { UserService } from './UserService';
-import { PlanService } from './PlanService';
-import { ReminderService } from './ReminderService';
+
+import type { User } from '../entities';
+
+import type { DutyReminderService } from './DutyReminderService';
 import { GitHubService } from './GitHubService';
+import type { PlanService } from './PlanService';
 import { PrReminderService } from './PrReminderService';
+import type { ReminderService } from './ReminderService';
 import { RepositoryService } from './RepositoryService';
-import { DutyReminderService } from './DutyReminderService';
-import { User } from '../entities';
+import type { UserService } from './UserService';
 
 export class SchedulerService {
   private planService: PlanService;
@@ -197,4 +199,4 @@ export class SchedulerService {
     const mentionText = mentions.join(', ');
     return `⏰ Дружеское напоминание: ${mentionText}, пожалуйста, не забудьте поделиться своими планами на день!`;
   }
-} 
+}

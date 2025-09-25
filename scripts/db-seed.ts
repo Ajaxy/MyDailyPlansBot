@@ -1,6 +1,7 @@
 import { AppDataSource } from '../src/config/database';
-import '../src/config/dotenv'; // Import to ensure environment variables are loaded
 import { User } from '../src/entities';
+
+import '../src/config/dotenv'; // Import to ensure environment variables are loaded
 
 export async function seedDatabase(withStubs = false): Promise<void> {
   console.log(withStubs

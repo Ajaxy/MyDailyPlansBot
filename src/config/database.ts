@@ -1,10 +1,10 @@
-import { DataSource } from 'typeorm';
 import * as path from 'path';
-import { env } from './dotenv';
-import { Plan, ReminderState, Repository, User, Off } from '../entities';
-
 // Import pg to define custom type parser for bigint
 import { types } from 'pg';
+import { DataSource } from 'typeorm';
+
+import { Off, Plan, ReminderState, Repository, User } from '../entities';
+import { env } from './dotenv';
 
 // Configure PostgreSQL to return bigint as JavaScript numbers
 types.setTypeParser(types.builtins.INT8, (val: string | null) => (val === null ? null : parseInt(val, 10)));

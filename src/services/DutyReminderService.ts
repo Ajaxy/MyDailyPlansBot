@@ -1,8 +1,10 @@
-import { Bot } from 'grammy';
 import { Client } from '@notionhq/client';
-import { UserService } from './UserService';
-import { User } from '../entities';
+import type { Bot } from 'grammy';
+
 import { env } from '../config/dotenv';
+import type { User } from '../entities';
+
+import type { UserService } from './UserService';
 
 interface DutyAssignment {
   date: string;
@@ -171,7 +173,6 @@ export class DutyReminderService {
         // Table structure: Date | Weekday | Username(s)
         if (cells.length >= 3) {
           const dateText = this.extractTextFromCell(cells[0]);
-          const weekdayText = this.extractTextFromCell(cells[1]);
           const usernameCell = cells[2];
 
           // Skip header rows
@@ -275,15 +276,15 @@ export class DutyReminderService {
 
     if (!user) {
       // No user found with this Notion username
-      return `🔔 <b>Сегодня дежурит: ${escapedNotionName}</b>\n\n` +
-        `⚠️ Пользователь с Notion username "${escapedNotionName}" не найден в этом чате.\n\n` +
-        `📋 <a href="${NOTION_PAGE_URL}">Задачи дежурного</a>`;
+      return `🔔 <b>Сегодня дежурит: ${escapedNotionName}</b>\n\n`
+        + `⚠️ Пользователь с Notion username "${escapedNotionName}" не найден в этом чате.\n\n`
+        + `📋 <a href="${NOTION_PAGE_URL}">Задачи дежурного</a>`;
     }
 
     const escapedUsername = this.escapeHtml(user.username);
-    return `🔔 <b>Напоминание о дежурстве</b>\n\n` +
-      `👤 Сегодня дежурит: <b>@${escapedUsername}</b> (${escapedNotionName})\n\n` +
-      `📋 Пожалуйста, не забудьте выполнить все <a href="${NOTION_PAGE_URL}">задачи дежурного</a>!`;
+    return `🔔 <b>Напоминание о дежурстве</b>\n\n`
+      + `👤 Сегодня дежурит: <b>@${escapedUsername}</b> (${escapedNotionName})\n\n`
+      + `📋 Пожалуйста, не забудьте выполнить все <a href="${NOTION_PAGE_URL}">задачи дежурного</a>!`;
   }
 
   /**

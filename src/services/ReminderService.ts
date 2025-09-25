@@ -1,6 +1,7 @@
-import { DataSource, Repository } from 'typeorm';
-import { ReminderState } from '../entities';
+import type { DataSource, Repository } from 'typeorm';
+
 import { AppDataSource } from '../config/database';
+import { ReminderState } from '../entities';
 
 export class ReminderService {
   private reminderStateRepository: Repository<ReminderState>;
@@ -95,4 +96,4 @@ export class ReminderService {
   private getStateId(chatId: number, date: string): string {
     return `${chatId}_${date}`;
   }
-} 
+}

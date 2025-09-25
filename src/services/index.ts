@@ -7,4 +7,4 @@ export { GitHubService } from './GitHubService';
 export { PrReminderService } from './PrReminderService';
 export { RepositoryService } from './RepositoryService';
 export { DutyReminderService } from './DutyReminderService';
-export { OffService } from './OffService'; 
+export { OffService } from './OffService';

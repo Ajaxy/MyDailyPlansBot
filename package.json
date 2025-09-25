@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --sourceMap",
     "start": "node dist/worker/index.js",
     "bs": "npm run build && npm run start",
-    "lint": "eslint --ext .ts src/",
+    "lint": "eslint .",
     "dev": "nodemon --exec ts-node --transpile-only src/worker/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -14,7 +14,10 @@
     "prestart": "npm run build",
     "clean": "rm -rf dist",
     "db:create": "ts-node --transpile-only scripts/db-create.ts",
-    "db:seed": "ts-node --transpile-only scripts/db-seed.ts"
+    "db:seed": "ts-node --transpile-only scripts/db-seed.ts",
+    "check": "tsc && eslint .",
+    "check:fix": "npm run check -- --fix",
+    "prepare": "husky install"
   },
   "ts-node": {
     "files": true,
@@ -27,6 +30,14 @@
   "author": "",
   "license": "ISC",
   "description": "MyDailyPlans - Team Daily Plans Sync Bot",
+  "husky": {
+    "hooks": {
+      "pre-commit": "tsc && lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js}": "eslint --fix"
+  },
   "dependencies": {
     "@notionhq/client": "^5.1.0",
     "dotenv": "^16.5.0",
@@ -41,11 +52,11 @@
     "@types/node": "^22.15.29",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.11.10",
-    "@typescript-eslint/eslint-plugin": "^8.33.0",
-    "@typescript-eslint/parser": "^8.33.0",
-    "eslint": "^8.57.1",
-    "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-plugin-import": "^2.31.0",
+    "@mytonwallet/eslint-config": "github:mytonwallet-org/eslint-config",
+    "eslint": "^9.27.0",
+    "typescript-eslint": "^8.38.0",
+    "husky": "^7.0.4",
+    "lint-staged": "^12.4.1",
     "jest": "^29.7.0",
     "nodemon": "^3.1.10",
     "ts-jest": "^29.3.4",

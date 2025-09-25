@@ -66,4 +66,4 @@ export interface MockUpdate {
       status: string;
     };
   };
-} 
+}

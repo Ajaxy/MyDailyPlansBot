@@ -1,8 +1,9 @@
-import 'reflect-metadata'; // Required for TypeORM
 import { PROJECT_NAME } from '../config';
-import { env } from '../config/dotenv';
 import { initializeDatabase } from '../config/database';
+import { env } from '../config/dotenv';
 import { BotService } from '../services';
+
+import 'reflect-metadata'; // Required for TypeORM
 
 (async () => {
   try {
@@ -36,17 +37,17 @@ import { BotService } from '../services';
             }
 
             console.log(`Triggering manual reminder${hour !== undefined ? ` (hour: ${hour})` : ''}...`);
-            botService.triggerReminder(hour).catch(error => {
+            botService.triggerReminder(hour).catch((error) => {
               console.error('Error triggering reminder:', error);
             });
           } else if (input === 'remind_pr') {
             console.log('Triggering manual PR reminders...');
-            botService.triggerPrReminder().catch(error => {
+            botService.triggerPrReminder().catch((error) => {
               console.error('Error triggering PR reminder:', error);
             });
           } else if (input === 'remind_duty') {
             console.log('Triggering manual duty reminders...');
-            botService.triggerDutyReminder().catch(error => {
+            botService.triggerDutyReminder().catch((error) => {
               console.error('Error triggering duty reminder:', error);
             });
           } else if (input === 'quit' || input === 'exit') {
