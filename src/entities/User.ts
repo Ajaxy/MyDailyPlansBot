@@ -18,12 +18,16 @@ export class User {
   @Column({ type: 'varchar', length: 255, name: 'github_username', nullable: true })
   githubUsername?: string;
 
+  @Column({ type: 'varchar', length: 255, name: 'notion_username', nullable: true })
+  notionUsername?: string;
+
   constructor(
     telegramId?: number,
     chatId?: number,
     username?: string,
     isActive?: boolean,
-    githubUsername?: string
+    githubUsername?: string,
+    notionUsername?: string
   ) {
     if (telegramId !== undefined) {
       this.telegramId = telegramId;
@@ -39,6 +43,9 @@ export class User {
     }
     if (githubUsername !== undefined) {
       this.githubUsername = githubUsername;
+    }
+    if (notionUsername !== undefined) {
+      this.notionUsername = notionUsername;
     }
   }
 } 

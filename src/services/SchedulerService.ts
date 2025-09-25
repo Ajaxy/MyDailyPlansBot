@@ -6,6 +6,7 @@ import { ReminderService } from './ReminderService';
 import { GitHubService } from './GitHubService';
 import { PrReminderService } from './PrReminderService';
 import { RepositoryService } from './RepositoryService';
+import { DutyReminderService } from './DutyReminderService';
 import { REMINDER_SCHEDULE, WORKING_DAYS } from '../types';
 import { User } from '../entities';
 
@@ -15,12 +16,14 @@ export class SchedulerService {
   private bot: Bot;
   private userService: UserService;
   private prReminderService: PrReminderService;
+  private dutyReminderService: DutyReminderService;
 
-  constructor(bot: Bot, planService: PlanService, reminderService: ReminderService, userService: UserService) {
+  constructor(bot: Bot, planService: PlanService, reminderService: ReminderService, userService: UserService, dutyReminderService: DutyReminderService) {
     this.bot = bot;
     this.planService = planService;
     this.reminderService = reminderService;
     this.userService = userService;
+    this.dutyReminderService = dutyReminderService;
     
     // Initialize GitHub and PR reminder services
     const repositoryService = new RepositoryService();
@@ -50,8 +53,16 @@ export class SchedulerService {
       timezone: 'GMT'
     });
 
+    // Duty reminders at 12:00 AM (00:00) GMT every day
+    cron.schedule('0 0 * * *', async () => {
+      await this.sendDutyReminders();
+    }, {
+      timezone: 'GMT'
+    });
+
     console.log('Daily plan reminder scheduler started');
     console.log('PR reminder scheduler started (10:00 and 16:00 GMT)');
+    console.log('Duty reminder scheduler started (12:00 AM GMT daily)');
   }
 
   private getCurrentDate(): string {
@@ -174,5 +185,13 @@ export class SchedulerService {
    */
   public getPrReminderService(): PrReminderService {
     return this.prReminderService;
+  }
+
+  public async sendDutyReminders(): Promise<void> {
+    try {
+      await this.dutyReminderService.sendDutyReminders();
+    } catch (error) {
+      console.error('Error in scheduled duty reminders:', error);
+    }
   }
 } 

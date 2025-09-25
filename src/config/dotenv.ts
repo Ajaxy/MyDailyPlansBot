@@ -61,6 +61,9 @@ export const env = {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
   },
   database: databaseConfig,
+  notion: {
+    token: process.env.NOTION_TOKEN || '',
+  },
 };
 
 export default env;

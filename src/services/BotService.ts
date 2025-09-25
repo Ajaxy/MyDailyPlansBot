@@ -3,6 +3,7 @@ import { SchedulerService } from './SchedulerService';
 import { UserService } from './UserService';
 import { PlanService } from './PlanService';
 import { ReminderService } from './ReminderService';
+import { DutyReminderService } from './DutyReminderService';
 import { BotConfig } from '../types';
 import { User } from '../entities';
 
@@ -12,6 +13,7 @@ export class BotService {
   private reminderService: ReminderService;
   private scheduler: SchedulerService;
   private userService: UserService;
+  private dutyReminderService: DutyReminderService;
   private config: BotConfig;
 
   constructor(config: BotConfig) {
@@ -20,7 +22,8 @@ export class BotService {
     this.planService = new PlanService();
     this.reminderService = new ReminderService();
     this.userService = new UserService();
-    this.scheduler = new SchedulerService(this.bot, this.planService, this.reminderService, this.userService);
+    this.dutyReminderService = new DutyReminderService(this.bot, this.userService);
+    this.scheduler = new SchedulerService(this.bot, this.planService, this.reminderService, this.userService, this.dutyReminderService);
 
     this.setupHandlers();
     this.setupErrorHandling();
@@ -115,6 +118,33 @@ export class BotService {
       }
     });
 
+    // Handle /remind_duty command to manually trigger duty reminders
+    this.bot.command('remind_duty', async (ctx) => {
+      if (ctx.chat.type === 'private') {
+        await ctx.reply('Эта команда работает только в групповых чатах.');
+        return;
+      }
+
+      const chatId = ctx.chat.id;
+      
+      // Only allow in the specific duty chat
+      if (chatId !== -1001783045675) {
+        await ctx.reply('Напоминания о дежурстве доступны только в специальном чате.');
+        return;
+      }
+
+      try {
+        await ctx.reply('🔄 Проверяю дежурство на сегодня...');
+        
+        // Send duty reminder only for this specific chat
+        await this.dutyReminderService.sendDutyReminderToChat(chatId);
+        
+      } catch (error) {
+        console.error('Error sending duty reminder:', error);
+        await ctx.reply('❌ Ошибка при отправке напоминания о дежурстве.');
+      }
+    });
+
     // Handle /help command
     this.bot.command('help', async (ctx) => {
       const helpMessage = `
@@ -130,6 +160,7 @@ export class BotService {
 *Команды:*
 /status - Проверить, кто ответил сегодня
 /remind_pr - Отправить напоминания о PR вручную
+/remind_duty - Отправить напоминание о дежурстве
 /help - Показать эту справку
 
 *Настройка:*
@@ -278,5 +309,11 @@ export class BotService {
     console.log('Manually triggering PR reminders...');
     const scheduler = this.getScheduler();
     await scheduler.sendPrReminders();
+  }
+
+  // For manual duty reminder triggering in development
+  public async triggerDutyReminder(): Promise<void> {
+    console.log('Manually triggering duty reminders...');
+    await this.dutyReminderService.sendDutyReminders();
   }
 } 

@@ -28,12 +28,13 @@
   "license": "ISC",
   "description": "MyDailyPlans - Team Daily Plans Sync Bot",
   "dependencies": {
+    "@notionhq/client": "^5.1.0",
     "dotenv": "^16.5.0",
     "grammy": "^1.36.3",
     "node-cron": "^4.1.0",
-    "typeorm": "^0.3.20",
     "pg": "^8.12.0",
-    "reflect-metadata": "^0.2.2"
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^0.3.20"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

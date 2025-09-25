@@ -15,6 +15,12 @@ A Telegram bot designed to help teams stay synchronized with daily plans. The bo
 - **Direct Links**: Clickable PR links for easy access
 - **Multi-repo Support**: Monitors multiple GitHub repositories
 
+### 📅 Duty Reminders
+- **Automatic Duty Checks**: 12:00 AM GMT daily
+- **Notion Integration**: Fetches duty assignments from Notion database
+- **User Mapping**: Maps Notion usernames to Telegram usernames
+- **Manual Trigger**: `/remind_duty` command for on-demand reminders
+
 ### 📊 User Management
 - **Database-driven**: User tracking managed through PostgreSQL
 - **Per-chat Configuration**: Users tracked separately for each chat
@@ -24,6 +30,7 @@ A Telegram bot designed to help teams stay synchronized with daily plans. The bo
 ### 💬 Bot Commands
 - `/status` - Check who has replied today and reminder count
 - `/remind_pr` - Manually trigger PR reminders for the current chat
+- `/remind_duty` - Manually trigger duty reminder for the current chat
 - `/help` - Show command help
 
 ### 🎯 Smart Response Detection
@@ -45,14 +52,12 @@ Create a `.env` file in the project root:
 
 **Option 1: Using DATABASE_URL (Heroku Postgres)**
 ```env
-TELEGRAM_BOT_TOKEN=your_bot_token_here
 DATABASE_URL=postgres://username:password@hostname:port/database
 ```
 *Note: SSL is automatically enabled when using `DATABASE_URL`*
 
 **Option 2: Using individual database variables**
 ```env
-TELEGRAM_BOT_TOKEN=your_bot_token_here
 DB_HOST=localhost
 DB_PORT=5432
 DB_USERNAME=postgres
