@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { AppDataSource } from '../src/config/database';
 import { User } from '../src/entities';
 

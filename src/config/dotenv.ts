@@ -1,13 +1,15 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
+import { logger } from '../util/logger';
+
 // Configure dotenv to properly load .env file from root directory
 const result = dotenv.config({
   path: path.resolve(process.cwd(), '.env'),
 });
 
 if (result.error) {
-  console.warn('Warning: .env file not found or cannot be read.');
+  logger.warn('Warning: .env file not found or cannot be read.');
 }
 
 function parseDatabaseUrl(url: string) {
@@ -21,7 +23,7 @@ function parseDatabaseUrl(url: string) {
       database: parsed.pathname.slice(1),
     };
   } catch (error) {
-    throw new Error(`Invalid DATABASE_URL format: ${error}`);
+    throw new Error(`Invalid DATABASE_URL format: ${String(error)}`);
   }
 }
 
@@ -34,8 +36,8 @@ if (process.env.DATABASE_URL) {
   const missingDbEnvVars = requiredDbEnvVars.filter((envVar) => !process.env[envVar]);
 
   if (missingDbEnvVars.length) {
-    console.error(`Error: Missing database environment variables: ${missingDbEnvVars.join(', ')}`);
-    console.error('Provide either DATABASE_URL or all individual DB_ variables');
+    logger.error(`Error: Missing database environment variables: ${missingDbEnvVars.join(', ')}`);
+    logger.error('Provide either DATABASE_URL or all individual DB_ variables');
   }
 
   databaseConfig = {
@@ -50,7 +52,7 @@ if (process.env.DATABASE_URL) {
 const requiredEnvVars = ['TELEGRAM_BOT_TOKEN'];
 const missingRequiredEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 if (missingRequiredEnvVars.length) {
-  console.error(`Error: Missing environment variables: ${missingRequiredEnvVars.join(', ')}`);
+  logger.error(`Error: Missing environment variables: ${missingRequiredEnvVars.join(', ')}`);
 }
 
 export const env = {

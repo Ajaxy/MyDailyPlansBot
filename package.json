@@ -30,11 +30,6 @@
   "author": "",
   "license": "ISC",
   "description": "MyDailyPlans - Team Daily Plans Sync Bot",
-  "husky": {
-    "hooks": {
-      "pre-commit": "tsc && lint-staged"
-    }
-  },
   "lint-staged": {
     "*.{ts,tsx,js}": "eslint --fix"
   },

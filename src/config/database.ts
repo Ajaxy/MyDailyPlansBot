@@ -3,10 +3,12 @@ import * as path from 'path';
 import { types } from 'pg';
 import { DataSource } from 'typeorm';
 
+import { logger } from '../util/logger';
 import { Off, Plan, ReminderState, Repository, User } from '../entities';
 import { env } from './dotenv';
 
 // Configure PostgreSQL to return bigint as JavaScript numbers
+// eslint-disable-next-line no-null/no-null
 types.setTypeParser(types.builtins.INT8, (val: string | null) => (val === null ? null : parseInt(val, 10)));
 
 const sslConfig = process.env.DATABASE_URL ? {
@@ -40,9 +42,9 @@ export const AppDataSource = new DataSource({
 export const initializeDatabase = async (): Promise<void> => {
   try {
     await AppDataSource.initialize();
-    console.log('Database connection established successfully');
+    logger.info('Database connection established successfully');
   } catch (error) {
-    console.error('Error initializing database connection:', error);
+    logger.error('Error initializing database connection:', error);
     throw error;
   }
 };

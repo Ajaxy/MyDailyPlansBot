@@ -1,6 +1,7 @@
 import type { Bot } from 'grammy';
 import * as cron from 'node-cron';
 
+import { logger } from '../util/logger';
 import type { User } from '../entities';
 
 import type { DutyReminderService } from './DutyReminderService';
@@ -65,9 +66,9 @@ export class SchedulerService {
       timezone: 'GMT',
     });
 
-    console.log('Daily plan reminder scheduler started');
-    console.log('PR reminder scheduler started (10:00 and 16:00 GMT)');
-    console.log('Duty reminder scheduler started (12:00 AM GMT daily)');
+    logger.info('Daily plan reminder scheduler started');
+    logger.info('PR reminder scheduler started (10:00 and 16:00 GMT)');
+    logger.info('Duty reminder scheduler started (12:00 AM GMT daily)');
   }
 
   public async sendInitialReminder(): Promise<void> {
@@ -89,13 +90,13 @@ export class SchedulerService {
           await this.bot.api.sendMessage(chatId, message);
           await this.reminderService.incrementReminderCount(chatId, date);
 
-          console.log(`Sent initial reminder to chat ${chatId} for date ${date}`);
+          logger.info(`Sent initial reminder to chat ${chatId} for date ${date}`);
         } catch (error) {
-          console.error(`Error sending initial reminder to chat ${chatId}:`, error);
+          logger.error(`Error sending initial reminder to chat ${chatId}:`, error);
         }
       }
     } catch (error) {
-      console.error('Error getting active chat IDs:', error);
+      logger.error('Error getting active chat IDs:', error);
     }
   }
 
@@ -126,13 +127,15 @@ export class SchedulerService {
           await this.bot.api.sendMessage(chatId, message, { parse_mode: 'Markdown' });
           await this.reminderService.incrementReminderCount(chatId, date);
 
-          console.log(`Sent follow-up reminder to chat ${chatId} for date ${date}, ${unrepliedUserIds.length} users pending`);
+          logger.info(
+            `Sent follow-up reminder to chat ${chatId} for date ${date}, ${unrepliedUserIds.length} users pending`,
+          );
         } catch (error) {
-          console.error(`Error sending follow-up reminder to chat ${chatId}:`, error);
+          logger.error(`Error sending follow-up reminder to chat ${chatId}:`, error);
         }
       }
     } catch (error) {
-      console.error('Error getting active chat IDs:', error);
+      logger.error('Error getting active chat IDs:', error);
     }
   }
 
@@ -145,11 +148,11 @@ export class SchedulerService {
    * Send PR reminders to all active chats
    */
   public async sendPrReminders(): Promise<void> {
-    console.log('Sending PR reminders...');
+    logger.info('Sending PR reminders...');
     try {
       await this.prReminderService.sendPrReminders();
     } catch (error) {
-      console.error('Error sending PR reminders:', error);
+      logger.error('Error sending PR reminders:', error);
     }
   }
 
@@ -164,7 +167,7 @@ export class SchedulerService {
     try {
       await this.dutyReminderService.sendDutyReminders();
     } catch (error) {
-      console.error('Error in scheduled duty reminders:', error);
+      logger.error('Error in scheduled duty reminders:', error);
     }
   }
 

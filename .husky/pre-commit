@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run TypeScript compiler to check types
+echo "🔍 Checking TypeScript..."
+npx tsc --noEmit
+
+# Run lint-staged to fix and check linting on staged files
+echo "✨ Running ESLint on staged files..."
+npx lint-staged

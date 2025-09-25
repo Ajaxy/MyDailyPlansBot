@@ -2,6 +2,7 @@ import { Client } from '@notionhq/client';
 import type { Bot } from 'grammy';
 
 import { env } from '../config/dotenv';
+import { logger } from '../util/logger';
 import type { User } from '../entities';
 
 import type { UserService } from './UserService';
@@ -25,7 +26,7 @@ export class DutyReminderService {
     this.userService = userService;
 
     if (!env.notion.token) {
-      console.warn('NOTION_TOKEN is not configured. DutyReminderService will not function properly.');
+      logger.warn('NOTION_TOKEN is not configured. DutyReminderService will not function properly.');
     }
 
     this.notion = new Client({
@@ -41,16 +42,16 @@ export class DutyReminderService {
       const todaysDuty = await this.getTodaysDuty();
 
       if (!todaysDuty) {
-        console.log('No duty assignment found for today');
+        logger.info('No duty assignment found for today');
         return;
       }
 
-      console.log(`Today's duty person: ${todaysDuty.person}`);
+      logger.info(`Today's duty person: ${todaysDuty.person}`);
 
       // Only send to the specific duty chat
       await this.sendDutyReminderToChat(this.DUTY_CHAT_ID, todaysDuty);
     } catch (error) {
-      console.error('Error sending duty reminders:', error);
+      logger.error('Error sending duty reminders:', error);
     }
   }
 
@@ -63,7 +64,7 @@ export class DutyReminderService {
       const duty = dutyAssignment || await this.getTodaysDuty();
 
       if (!duty) {
-        console.log(`No duty assignment found for today in chat ${chatId}`);
+        logger.info(`No duty assignment found for today in chat ${chatId}`);
         return;
       }
 
@@ -74,7 +75,7 @@ export class DutyReminderService {
       );
 
       if (!dutyUser) {
-        console.log(`No user found with Notion username "${duty.person}" in chat ${chatId}`);
+        logger.info(`No user found with Notion username "${duty.person}" in chat ${chatId}`);
       }
 
       // Build and send reminder message (handles both found and not found cases)
@@ -84,20 +85,24 @@ export class DutyReminderService {
         parse_mode: 'HTML',
       });
 
-      console.log(`Sent duty reminder to chat ${chatId} for ${dutyUser ? `user @${dutyUser.username}` : `Notion user "${duty.person}"`}`);
+      logger.info(
+        `Sent duty reminder to chat ${chatId} for ${
+          dutyUser ? `user @${dutyUser.username}` : `Notion user "${duty.person}"`
+        }`,
+      );
     } catch (error) {
-      console.error(`Error sending duty reminder to chat ${chatId}:`, error);
+      logger.error(`Error sending duty reminder to chat ${chatId}:`, error);
     }
   }
 
   /**
    * Fetch today's duty assignment from Notion
    */
-  private async getTodaysDuty(): Promise<DutyAssignment | null> {
+  private async getTodaysDuty(): Promise<DutyAssignment | undefined> {
     try {
       if (!env.notion.token) {
-        console.error('NOTION_TOKEN is not configured');
-        return null;
+        logger.error('NOTION_TOKEN is not configured');
+        return undefined;
       }
 
       // Get all blocks from the page
@@ -107,23 +112,23 @@ export class DutyReminderService {
       const tableBlocks = blocks.filter((block: any) => block.type === 'table');
 
       if (tableBlocks.length === 0) {
-        console.log('No table found on the Notion page');
-        return null;
+        logger.info('No table found on the Notion page');
+        return undefined;
       }
 
       // Process each table to find today's duty
       for (const table of tableBlocks) {
-        console.log(`Processing table block: ${table.id}`);
+        logger.info(`Processing table block: ${table.id}`);
         const dutyAssignment = await this.parseTableForDuty(table.id);
         if (dutyAssignment) {
           return dutyAssignment;
         }
       }
 
-      return null;
+      return undefined;
     } catch (error) {
-      console.error('Error fetching duty from Notion:', error);
-      return null;
+      logger.error('Error fetching duty from Notion:', error);
+      return undefined;
     }
   }
 
@@ -150,7 +155,7 @@ export class DutyReminderService {
   /**
    * Parse a table block to find today's duty assignment
    */
-  private async parseTableForDuty(tableId: string): Promise<DutyAssignment | null> {
+  private async parseTableForDuty(tableId: string): Promise<DutyAssignment | undefined> {
     try {
       // Get table rows
       const rows = await this.getPageBlocks(tableId);
@@ -159,11 +164,11 @@ export class DutyReminderService {
       const tableRows = rows.filter((block: any) => block.type === 'table_row');
 
       if (tableRows.length === 0) {
-        return null;
+        return undefined;
       }
 
       const todayDate = this.getTodayDate();
-      console.log(`Looking for duty assignment for date: ${todayDate}`);
+      logger.info(`Looking for duty assignment for date: ${todayDate}`);
 
       // Check each row for today's date
       for (let i = 0; i < tableRows.length; i++) {
@@ -177,7 +182,7 @@ export class DutyReminderService {
 
           // Skip header rows
           if (i === 0 && dateText.toLowerCase().includes('date')) {
-            console.log('Skipping header row');
+            logger.info('Skipping header row');
             continue;
           }
 
@@ -187,7 +192,7 @@ export class DutyReminderService {
             const activeUsername = await this.extractActiveUsername(usernameCell);
 
             if (activeUsername) {
-              console.log(`Found duty assignment for ${todayDate}: ${activeUsername}`);
+              logger.info(`Found duty assignment for ${todayDate}: ${activeUsername}`);
               return {
                 date: todayDate,
                 person: activeUsername,
@@ -197,10 +202,10 @@ export class DutyReminderService {
         }
       }
 
-      return null;
+      return undefined;
     } catch (error) {
-      console.error('Error parsing table:', error);
-      return null;
+      logger.error('Error parsing table:', error);
+      return undefined;
     }
   }
 
@@ -241,16 +246,16 @@ export class DutyReminderService {
           const userDetails = await this.notion.users.retrieve({ user_id: userId });
 
           if (userDetails.name) {
-            console.log(`Found user: ${userDetails.name}`);
+            logger.info(`Found user: ${userDetails.name}`);
             activeUsernames.push(userDetails.name);
           }
         } catch (error) {
-          console.error('Error fetching user details:', error);
+          logger.error('Error fetching user details:', error);
         }
       }
     }
 
-    console.log(`Found ${activeUsernames.length} active username(s) in cell:`, activeUsernames);
+    logger.info(`Found ${activeUsernames.length} active username(s) in cell:`, activeUsernames);
 
     // If multiple active usernames, take the last one (most recent)
     if (activeUsernames.length > 0) {

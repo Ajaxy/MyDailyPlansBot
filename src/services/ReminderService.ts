@@ -1,6 +1,7 @@
 import type { DataSource, Repository } from 'typeorm';
 
 import { AppDataSource } from '../config/database';
+import { logger } from '../util/logger';
 import { ReminderState } from '../entities';
 
 export class ReminderService {
@@ -30,7 +31,7 @@ export class ReminderService {
 
       return reminderState;
     } catch (error) {
-      console.error('Error getting or creating reminder state:', error);
+      logger.error('Error getting or creating reminder state:', error);
       throw error;
     }
   }
@@ -46,7 +47,7 @@ export class ReminderService {
       const updatedState = await this.reminderStateRepository.save(reminderState);
       return updatedState.reminderCount;
     } catch (error) {
-      console.error('Error incrementing reminder count:', error);
+      logger.error('Error incrementing reminder count:', error);
       throw error;
     }
   }
@@ -59,7 +60,7 @@ export class ReminderService {
       const reminderState = await this.getOrCreateReminderState(chatId, date);
       return reminderState.reminderCount;
     } catch (error) {
-      console.error('Error getting reminder count:', error);
+      logger.error('Error getting reminder count:', error);
       throw error;
     }
   }
@@ -72,7 +73,7 @@ export class ReminderService {
       const stateId = this.getStateId(chatId, date);
       await this.reminderStateRepository.delete({ id: stateId });
     } catch (error) {
-      console.error('Error resetting reminder state:', error);
+      logger.error('Error resetting reminder state:', error);
       throw error;
     }
   }
@@ -80,15 +81,15 @@ export class ReminderService {
   /**
    * Get last reminder time for a chat and date
    */
-  public async getLastReminderTime(chatId: number, date: string): Promise<Date | null> {
+  public async getLastReminderTime(chatId: number, date: string): Promise<Date | undefined> {
     try {
       const reminderState = await this.reminderStateRepository.findOne({
         where: { id: this.getStateId(chatId, date) },
       });
 
-      return reminderState?.lastReminderTime || null;
+      return reminderState?.lastReminderTime || undefined;
     } catch (error) {
-      console.error('Error getting last reminder time:', error);
+      logger.error('Error getting last reminder time:', error);
       throw error;
     }
   }

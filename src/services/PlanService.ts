@@ -1,6 +1,7 @@
 import type { DataSource, Repository } from 'typeorm';
 
 import { AppDataSource } from '../config/database';
+import { logger } from '../util/logger';
 import { Plan } from '../entities';
 
 export class PlanService {
@@ -26,7 +27,7 @@ export class PlanService {
       const plan = new Plan(userTelegramId, chatId, date, messageId, messageText);
       return await this.planRepository.save(plan);
     } catch (error) {
-      console.error('Error inserting plan:', error);
+      logger.error('Error inserting plan:', error);
       throw error;
     }
   }
@@ -48,7 +49,7 @@ export class PlanService {
       const uniqueUserIds = [...new Set(plans.map((plan) => plan.userTelegramId))];
       return uniqueUserIds;
     } catch (error) {
-      console.error('Error getting replied user IDs:', error);
+      logger.error('Error getting replied user IDs:', error);
       throw error;
     }
   }
@@ -66,9 +67,9 @@ export class PlanService {
         },
       });
 
-      return plan !== null;
+      return plan !== undefined;
     } catch (error) {
-      console.error('Error checking if user replied:', error);
+      logger.error('Error checking if user replied:', error);
       throw error;
     }
   }
@@ -81,7 +82,7 @@ export class PlanService {
       const repliedUserIds = await this.getRepliedUserIds(chatId, date);
       return trackedUserIds.filter((userId) => !repliedUserIds.includes(userId));
     } catch (error) {
-      console.error('Error getting unreplied user IDs:', error);
+      logger.error('Error getting unreplied user IDs:', error);
       throw error;
     }
   }
@@ -101,7 +102,7 @@ export class PlanService {
         },
       });
     } catch (error) {
-      console.error('Error getting plans for chat and date:', error);
+      logger.error('Error getting plans for chat and date:', error);
       throw error;
     }
   }
@@ -118,7 +119,7 @@ export class PlanService {
         },
       });
     } catch (error) {
-      console.error('Error getting plan count:', error);
+      logger.error('Error getting plan count:', error);
       throw error;
     }
   }
@@ -136,7 +137,7 @@ export class PlanService {
         },
       });
     } catch (error) {
-      console.error('Error getting plan:', error);
+      logger.error('Error getting plan:', error);
       throw error;
     }
   }
@@ -151,7 +152,7 @@ export class PlanService {
         date,
       });
     } catch (error) {
-      console.error('Error removing plans for date:', error);
+      logger.error('Error removing plans for date:', error);
       throw error;
     }
   }

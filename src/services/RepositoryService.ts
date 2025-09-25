@@ -1,6 +1,7 @@
 import type { DataSource, Repository as TypeOrmRepository } from 'typeorm';
 
 import { AppDataSource } from '../config/database';
+import { logger } from '../util/logger';
 import { Repository } from '../entities';
 
 export class RepositoryService {
@@ -21,7 +22,7 @@ export class RepositoryService {
 
       return repositories;
     } catch (error) {
-      console.error(`Error fetching active repositories for chat ${chatId}:`, error);
+      logger.error(`Error fetching active repositories for chat ${chatId}:`, error);
       return [];
     }
   }
@@ -34,7 +35,7 @@ export class RepositoryService {
       const repository = new Repository(chatId, fullName, true);
       return await this.repositoryRepository.save(repository);
     } catch (error) {
-      console.error('Error adding repository:', error);
+      logger.error('Error adding repository:', error);
       throw error;
     }
   }
@@ -46,7 +47,7 @@ export class RepositoryService {
     try {
       await this.repositoryRepository.update({ fullName, chatId }, { isActive });
     } catch (error) {
-      console.error('Error toggling repository status:', error);
+      logger.error('Error toggling repository status:', error);
       throw error;
     }
   }
@@ -58,7 +59,7 @@ export class RepositoryService {
     try {
       await this.repositoryRepository.update({ id }, { isActive });
     } catch (error) {
-      console.error('Error toggling repository status:', error);
+      logger.error('Error toggling repository status:', error);
       throw error;
     }
   }

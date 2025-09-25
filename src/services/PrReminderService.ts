@@ -1,5 +1,6 @@
 import type { Bot } from 'grammy';
 
+import { logger } from '../util/logger';
 import type { User } from '../entities';
 
 import type { GitHubService } from './GitHubService';
@@ -31,7 +32,7 @@ export class PrReminderService {
         await this.sendPrReminderToChat(chatId);
       }
     } catch (error) {
-      console.error('Error sending PR reminders:', error);
+      logger.error('Error sending PR reminders:', error);
     }
   }
 
@@ -45,7 +46,7 @@ export class PrReminderService {
       const usersWithGitHub = activeUsers.filter((user: User) => user.githubUsername);
 
       if (usersWithGitHub.length === 0) {
-        console.log(`No users with GitHub usernames in chat ${chatId}, skipping PR reminder`);
+        logger.info(`No users with GitHub usernames in chat ${chatId}, skipping PR reminder`);
         return;
       }
 
@@ -62,12 +63,12 @@ export class PrReminderService {
         await this.bot.api.sendMessage(chatId, message, {
           parse_mode: 'HTML',
         });
-        console.log(`Sent PR reminder to chat ${chatId}`);
+        logger.info(`Sent PR reminder to chat ${chatId}`);
       } else {
-        console.log(`No PRs to remind about in chat ${chatId}`);
+        logger.info(`No PRs to remind about in chat ${chatId}`);
       }
     } catch (error) {
-      console.error(`Error sending PR reminder to chat ${chatId}:`, error);
+      logger.error(`Error sending PR reminder to chat ${chatId}:`, error);
     }
   }
 
@@ -80,7 +81,7 @@ export class PrReminderService {
       githubUsername: string;
       prs: Array<{ number: number; title: string; url: string; repo: string }>;
     }>,
-  ): string | null {
+  ): string | undefined {
     const userMessages: string[] = [];
 
     for (const user of users) {
@@ -102,7 +103,7 @@ export class PrReminderService {
     }
 
     if (userMessages.length === 0) {
-      return null;
+      return undefined;
     }
 
     // Header in Russian as requested

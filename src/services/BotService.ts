@@ -2,6 +2,7 @@ import { Bot, GrammyError, HttpError } from 'grammy';
 
 import type { BotConfig } from '../types';
 
+import { logger } from '../util/logger';
 import type { User } from '../entities';
 
 import { DutyReminderService } from './DutyReminderService';
@@ -38,13 +39,13 @@ export class BotService {
   }
 
   public async start(): Promise<void> {
-    console.log('Starting MyDailyPlans bot...');
+    logger.info('Starting MyDailyPlans bot...');
 
     try {
       const activeChatIds = await this.userService.getActiveChatIds();
-      console.log(`Active chats configured: ${activeChatIds.join(', ')}`);
+      logger.info(`Active chats configured: ${activeChatIds.join(', ')}`);
     } catch (error) {
-      console.log('No active chats found in database');
+      logger.info('No active chats found in database');
     }
 
     // Start the scheduler
@@ -52,13 +53,13 @@ export class BotService {
 
     // Start the bot
     await this.bot.start();
-    console.log('MyDailyPlans bot started successfully');
+    logger.info('MyDailyPlans bot started successfully');
   }
 
   public async stop(): Promise<void> {
-    console.log('Stopping MyDailyPlans bot...');
+    logger.info('Stopping MyDailyPlans bot...');
     await this.bot.stop();
-    console.log('MyDailyPlans bot stopped');
+    logger.info('MyDailyPlans bot stopped');
   }
 
   // For testing purposes
@@ -84,7 +85,7 @@ export class BotService {
 
   // For manual reminder triggering in development
   public async triggerReminder(hour?: number): Promise<void> {
-    console.log('Manually triggering reminders...');
+    logger.info('Manually triggering reminders...');
     const scheduler = this.getScheduler();
 
     // Use provided hour or current time to determine reminder type
@@ -92,25 +93,25 @@ export class BotService {
 
     if (targetHour === 6) {
       // Trigger initial reminder
-      console.log('Triggering initial reminder (6 AM type)');
+      logger.info('Triggering initial reminder (6 AM type)');
       await scheduler.sendInitialReminder();
     } else {
       // Trigger follow-up reminder
-      console.log('Triggering follow-up reminder');
+      logger.info('Triggering follow-up reminder');
       await scheduler.sendFollowUpReminder();
     }
   }
 
   // For manual PR reminder triggering in development
   public async triggerPrReminder(): Promise<void> {
-    console.log('Manually triggering PR reminders...');
+    logger.info('Manually triggering PR reminders...');
     const scheduler = this.getScheduler();
     await scheduler.sendPrReminders();
   }
 
   // For manual duty reminder triggering in development
   public async triggerDutyReminder(): Promise<void> {
-    console.log('Manually triggering duty reminders...');
+    logger.info('Manually triggering duty reminders...');
     await this.dutyReminderService.sendDutyReminders();
   }
 
@@ -121,11 +122,12 @@ export class BotService {
       const chat = ctx.chat;
 
       if (chatMember.new_chat_member.status === 'member' || chatMember.new_chat_member.status === 'administrator') {
-        console.log(`Bot added to chat: ${chat.id} (${chat.title || 'Private chat'})`);
+        logger.info(`Bot added to chat: ${chat.id} (${chat.title || 'Private chat'})`);
 
         await ctx.reply(
           '👋 Привет! Я бот *MyDailyPlans*, помогаю всем быть в курсе ежедневных планов команды.'
-          + '\n\nБуду напоминать рассказывать о планах на день: в рабочие дни в 6:00 GMT, с несколькими повторениями до 15:00 GMT.'
+          + '\n\nБуду напоминать рассказывать о планах на день: '
+          + 'в рабочие дни в 6:00 GMT, с несколькими повторениями до 15:00 GMT.'
           + '\n\n*Команды:*'
           + '\n/status - Проверить статус ответов'
           + '\n/remind_pr - Отправить напоминания о PR'
@@ -133,7 +135,7 @@ export class BotService {
           { parse_mode: 'Markdown' },
         );
       } else if (chatMember.new_chat_member.status === 'left' || chatMember.new_chat_member.status === 'kicked') {
-        console.log(`Bot removed from chat: ${chat.id}`);
+        logger.info(`Bot removed from chat: ${chat.id}`);
       }
     });
 
@@ -175,7 +177,7 @@ export class BotService {
 
         await ctx.reply(statusMessage, { parse_mode: 'Markdown' });
       } catch (error) {
-        console.error('Error getting status:', error);
+        logger.error('Error getting status:', error);
         await ctx.reply('❌ Ошибка при получении статуса.');
       }
     });
@@ -198,7 +200,7 @@ export class BotService {
 
         // Note: Success/no PRs message will be sent by the PR reminder service itself
       } catch (error) {
-        console.error('Error sending PR reminders:', error);
+        logger.error('Error sending PR reminders:', error);
         await ctx.reply('❌ Ошибка при отправке напоминаний о PR.');
       }
     });
@@ -224,7 +226,7 @@ export class BotService {
         // Send duty reminder only for this specific chat
         await this.dutyReminderService.sendDutyReminderToChat(chatId);
       } catch (error) {
-        console.error('Error sending duty reminder:', error);
+        logger.error('Error sending duty reminder:', error);
         await ctx.reply('❌ Ошибка при отправке напоминания о дежурстве.');
       }
     });
@@ -263,7 +265,10 @@ export class BotService {
         // Find the user in the database
         const user = await this.userService.getUserByUsernameAndChat(username, chatId);
         if (!user) {
-          await ctx.reply(`❌ Пользователь @${username} не найден в этом чате. Убедитесь, что пользователь зарегистрирован.`);
+          await ctx.reply(
+            `❌ Пользователь @${username} не найден в этом чате. `
+            + 'Убедитесь, что пользователь зарегистрирован.',
+          );
           return;
         }
 
@@ -335,7 +340,7 @@ export class BotService {
           await ctx.reply(`✅ Добавлено отсутствие для @${username} с ${fromStr} по ${toStr}`);
         }
       } catch (error) {
-        console.error('Error handling /off command:', error);
+        logger.error('Error handling /off command:', error);
         await ctx.reply('❌ Произошла ошибка при добавлении отсутствия.');
       }
     });
@@ -395,7 +400,7 @@ export class BotService {
           if (!hasReplied) {
             // Save the plan to database
             await this.planService.insertPlan(userId, chatId, date, messageId, messageText);
-            console.log(`User ${userId} replied with daily plan in chat ${chatId} for date ${date}`);
+            logger.info(`User ${userId} replied with daily plan in chat ${chatId} for date ${date}`);
 
             // Check if everyone has replied
             const trackedUserIds = await this.userService.getTrackedUserIdsForChat(chatId);
@@ -407,11 +412,11 @@ export class BotService {
           } else {
             // User already replied today, save additional plan but don't send confirmation
             await this.planService.insertPlan(userId, chatId, date, messageId, messageText);
-            console.log(`User ${userId} sent additional daily plan in chat ${chatId} for date ${date}`);
+            logger.info(`User ${userId} sent additional daily plan in chat ${chatId} for date ${date}`);
           }
         }
       } catch (error) {
-        console.error('Error handling message:', error);
+        logger.error('Error handling message:', error);
       }
     });
   }
@@ -419,15 +424,15 @@ export class BotService {
   private setupErrorHandling(): void {
     this.bot.catch((err) => {
       const ctx = err.ctx;
-      console.error(`Error while handling update ${ctx.update.update_id}:`);
+      logger.error(`Error while handling update ${ctx.update.update_id}:`);
       const e = err.error;
 
       if (e instanceof GrammyError) {
-        console.error('Error in request:', e.description);
+        logger.error('Error in request:', e.description);
       } else if (e instanceof HttpError) {
-        console.error('Could not contact Telegram:', e);
+        logger.error('Could not contact Telegram:', e);
       } else {
-        console.error('Unknown error:', e);
+        logger.error('Unknown error:', e);
       }
     });
   }
@@ -439,7 +444,7 @@ export class BotService {
   /**
    * Parse date from DD.MM[.YYYY] format
    */
-  private parseDate(dateStr: string): Date | null {
+  private parseDate(dateStr: string): Date | undefined {
     // Remove any whitespace
     dateStr = dateStr.trim();
 
@@ -447,7 +452,7 @@ export class BotService {
     const parts = dateStr.split('.');
 
     if (parts.length < 2 || parts.length > 3) {
-      return null;
+      return undefined;
     }
 
     const day = parseInt(parts[0], 10);
@@ -456,11 +461,11 @@ export class BotService {
 
     // Validate values
     if (isNaN(day) || isNaN(month) || isNaN(year)) {
-      return null;
+      return undefined;
     }
 
     if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > 2100) {
-      return null;
+      return undefined;
     }
 
     // Create date (month is 0-indexed in JavaScript)
@@ -468,7 +473,7 @@ export class BotService {
 
     // Check if the date is valid (e.g., not Feb 31)
     if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
-      return null;
+      return undefined;
     }
 
     // Set time to start of day

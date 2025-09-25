@@ -1,3 +1,5 @@
+import { logger } from '../util/logger';
+
 import type { RepositoryService } from './RepositoryService';
 
 interface GitHubPr {
@@ -80,7 +82,7 @@ export class GitHubService {
         }
       }
     } catch (error) {
-      console.error('Error fetching assigned PRs:', error);
+      logger.error('Error fetching assigned PRs:', error);
     }
 
     return prsByUser;
@@ -95,14 +97,14 @@ export class GitHubService {
     const repositories = await this.repositoryService.getActiveRepositoriesForChat(chatId);
 
     if (repositories.length === 0) {
-      console.log(`No repositories configured for chat ${chatId}`);
+      logger.info(`No repositories configured for chat ${chatId}`);
       return [];
     }
 
     for (const repo of repositories) {
       try {
         if (!repo.ghToken) {
-          console.log(`No GitHub token configured for repository ${repo.fullName}, skipping`);
+          logger.info(`No GitHub token configured for repository ${repo.fullName}, skipping`);
           continue;
         }
 
@@ -116,14 +118,14 @@ export class GitHubService {
         const response = await fetch(url, { headers });
 
         if (!response.ok) {
-          console.error(`Failed to fetch PRs from ${repo.fullName}: ${response.status} ${response.statusText}`);
+          logger.error(`Failed to fetch PRs from ${repo.fullName}: ${response.status} ${response.statusText}`);
           continue;
         }
 
         const prs = await response.json() as GitHubPr[];
         allPrs.push(...prs);
       } catch (error) {
-        console.error(`Error fetching PRs from ${repo.fullName}:`, error);
+        logger.error(`Error fetching PRs from ${repo.fullName}:`, error);
       }
     }
 

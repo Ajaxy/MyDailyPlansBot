@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { spawn } from 'child_process';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -15,7 +16,8 @@ if (result.error) {
 }
 
 // Use the existing database configuration from dotenv
-const { host: DB_HOST, port: DB_PORT, username: DB_USERNAME, password: DB_PASSWORD, database: DB_DATABASE } = env.database;
+const { host: DB_HOST, port: DB_PORT, username: DB_USERNAME,
+  password: DB_PASSWORD, database: DB_DATABASE } = env.database;
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -24,9 +26,10 @@ const withStubs = args.includes('--with-stubs');
 
 console.log(`=== Database Setup Script ===`);
 console.log(`Target database: "${DB_DATABASE}" on ${DB_HOST}:${DB_PORT}`);
-console.log(`Options: ${force ? 'Force mode enabled' : 'Force mode disabled'}, ${withStubs ? 'Full stub seed enabled' : 'Essential seed only mode enabled'}`);
+console.log(`Options: ${force ? 'Force mode enabled' : 'Force mode disabled'}, `
+  + `${withStubs ? 'Full stub seed enabled' : 'Essential seed only mode enabled'}`);
 
-(async function runSetup() {
+void (async function runSetup() {
   await setupDatabase();
 })();
 
