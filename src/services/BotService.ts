@@ -4,6 +4,7 @@ import { UserService } from './UserService';
 import { PlanService } from './PlanService';
 import { ReminderService } from './ReminderService';
 import { DutyReminderService } from './DutyReminderService';
+import { OffService } from './OffService';
 import { BotConfig } from '../types';
 import { User } from '../entities';
 
@@ -14,6 +15,7 @@ export class BotService {
   private scheduler: SchedulerService;
   private userService: UserService;
   private dutyReminderService: DutyReminderService;
+  private offService: OffService;
   private config: BotConfig;
 
   constructor(config: BotConfig) {
@@ -22,6 +24,7 @@ export class BotService {
     this.planService = new PlanService();
     this.reminderService = new ReminderService();
     this.userService = new UserService();
+    this.offService = new OffService();
     this.dutyReminderService = new DutyReminderService(this.bot, this.userService);
     this.scheduler = new SchedulerService(this.bot,
       this.planService,
@@ -226,6 +229,118 @@ export class BotService {
       }
     });
 
+    // Handle /off command to register user's absence
+    this.bot.command('off', async (ctx) => {
+      if (ctx.chat.type === 'private') {
+        await ctx.reply('Эта команда работает только в групповых чатах.');
+        return;
+      }
+
+      const chatId = ctx.chat.id;
+      const commandText = ctx.message?.text || '';
+      const parts = commandText.split(' ').slice(1); // Remove /off
+
+      try {
+        // Parse the command arguments
+        let username: string | undefined;
+        let dateRange: string;
+
+        // Check if first argument is a username (starts with @)
+        if (parts.length > 0 && parts[0].startsWith('@')) {
+          username = parts[0].substring(1); // Remove @ symbol
+          dateRange = parts.slice(1).join(' ');
+        } else {
+          // No username specified, use current sender
+          username = ctx.from?.username;
+          dateRange = parts.join(' ');
+        }
+
+        if (!username) {
+          await ctx.reply('❌ Не удалось определить пользователя. Убедитесь, что у вас есть username в Telegram.');
+          return;
+        }
+
+        // Find the user in the database
+        const user = await this.userService.getUserByUsernameAndChat(username, chatId);
+        if (!user) {
+          await ctx.reply(`❌ Пользователь @${username} не найден в этом чате. Убедитесь, что пользователь зарегистрирован.`);
+          return;
+        }
+
+        // Parse dates
+        let fromDate: Date;
+        let toDate: Date;
+
+        if (!dateRange || dateRange.trim() === '') {
+          // No dates specified, default to today
+          fromDate = new Date();
+          toDate = new Date();
+          fromDate.setHours(0, 0, 0, 0);
+          toDate.setHours(0, 0, 0, 0);
+        } else if (dateRange.includes('-')) {
+          // Date range specified
+          const [fromStr, toStr] = dateRange.split('-').map(s => s.trim());
+          
+          if (!fromStr || fromStr === '') {
+            // Only end date specified, start from today
+            fromDate = new Date();
+            fromDate.setHours(0, 0, 0, 0);
+          } else {
+            const parsedFrom = this.parseDate(fromStr);
+            if (!parsedFrom) {
+              await ctx.reply('❌ Неверный формат даты начала. Используйте формат ДД.ММ[.ГГГГ].');
+              return;
+            }
+            fromDate = parsedFrom;
+          }
+
+          if (!toStr || toStr === '') {
+            await ctx.reply('❌ Не указана дата окончания. Используйте формат: /off [@username] [dateFrom-]dateTo');
+            return;
+          }
+
+          const parsedTo = this.parseDate(toStr);
+          if (!parsedTo) {
+            await ctx.reply('❌ Неверный формат даты окончания. Используйте формат ДД.ММ[.ГГГГ].');
+            return;
+          }
+          toDate = parsedTo;
+        } else {
+          // Single date specified
+          const parsedDate = this.parseDate(dateRange);
+          if (!parsedDate) {
+            await ctx.reply('❌ Неверный формат даты. Используйте формат ДД.ММ[.ГГГГ] или ДД.ММ-ДД.ММ для диапазона.');
+            return;
+          }
+          fromDate = new Date(parsedDate);
+          toDate = new Date(parsedDate);
+        }
+
+        // Ensure fromDate is not after toDate
+        if (fromDate > toDate) {
+          await ctx.reply('❌ Дата начала не может быть позже даты окончания.');
+          return;
+        }
+
+        // Create the off record
+        await this.offService.createOff(user.id, chatId, fromDate, toDate);
+
+        // Format dates for display
+        const fromStr = this.formatDate(fromDate);
+        const toStr = this.formatDate(toDate);
+        
+        if (fromStr === toStr) {
+          await ctx.reply(`✅ Добавлено отсутствие для @${username} на ${fromStr}`);
+        } else {
+          await ctx.reply(`✅ Добавлено отсутствие для @${username} с ${fromStr} по ${toStr}`);
+        }
+
+      } catch (error) {
+        console.error('Error handling /off command:', error);
+        await ctx.reply('❌ Произошла ошибка при добавлении отсутствия.');
+      }
+    });
+
     // Handle /help command
     this.bot.command('help', async (ctx) => {
       const helpMessage = `
@@ -242,6 +357,7 @@ export class BotService {
 /status - Проверить, кто ответил сегодня
 /remind_pr - Отправить напоминания о PR вручную
 /remind_duty - Отправить напоминание о дежурстве
+/off - Добавить отсутствие
 /help - Показать эту справку
 
 *Настройка:*
@@ -319,5 +435,56 @@ export class BotService {
 
   private getCurrentDate(): string {
     return new Date().toISOString().split('T')[0];
+  }
+
+  /**
+   * Parse date from DD.MM[.YYYY] format
+   */
+  private parseDate(dateStr: string): Date | null {
+    // Remove any whitespace
+    dateStr = dateStr.trim();
+    
+    // Split by dots
+    const parts = dateStr.split('.');
+    
+    if (parts.length < 2 || parts.length > 3) {
+      return null;
+    }
+    
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const year = parts.length === 3 ? parseInt(parts[2], 10) : new Date().getFullYear();
+    
+    // Validate values
+    if (isNaN(day) || isNaN(month) || isNaN(year)) {
+      return null;
+    }
+    
+    if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > 2100) {
+      return null;
+    }
+    
+    // Create date (month is 0-indexed in JavaScript)
+    const date = new Date(year, month - 1, day);
+    
+    // Check if the date is valid (e.g., not Feb 31)
+    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
+      return null;
+    }
+    
+    // Set time to start of day
+    date.setHours(0, 0, 0, 0);
+    
+    return date;
+  }
+
+  /**
+   * Format date to DD.MM.YYYY
+   */
+  private formatDate(date: Date): string {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}.${month}.${year}`;
   }
 } 

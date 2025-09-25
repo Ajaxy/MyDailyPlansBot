@@ -1,24 +1,41 @@
 import { Repository } from 'typeorm';
 import { AppDataSource } from '../config/database';
-import { User } from '../entities';
+import { User, Off } from '../entities';
 
 export class UserService {
   private userRepository: Repository<User>;
+  private offRepository: Repository<Off>;
 
   constructor() {
     this.userRepository = AppDataSource.getRepository(User);
+    this.offRepository = AppDataSource.getRepository(Off);
   }
 
   /**
-   * Get all active users for a specific chat
+   * Get all active users for a specific chat (excluding those who are off today)
    */
   async getActiveUsersForChat(chatId: number): Promise<User[]> {
-    return this.userRepository.find({
+    const activeUsers = await this.userRepository.find({
       where: {
         chatId,
         isActive: true,
       },
     });
+
+    // Filter out users who are off today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const activeUsersNotOff: User[] = [];
+
+    for (const user of activeUsers) {
+      const isOff = await this.isUserOffOnDate(user.id, chatId, today);
+      
+      if (!isOff) {
+        activeUsersNotOff.push(user);
+      }
+    }
+
+    return activeUsersNotOff;
   }
 
   /**
@@ -82,13 +99,24 @@ export class UserService {
   }
 
   /**
-   * Check if a user exists and is active
+   * Check if a user exists and is active (not deactivated and not off today)
    */
   async isUserActiveInChat(telegramId: number, chatId: number): Promise<boolean> {
     const user = await this.userRepository.findOne({
       where: { telegramId, chatId, isActive: true },
     });
-    return !!user;
+    
+    if (!user) {
+      return false;
+    }
+
+    // Check if user is off today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const isOff = await this.isUserOffOnDate(user.id, chatId, today);
+    
+    return !isOff;
   }
 
   /**
@@ -96,5 +124,28 @@ export class UserService {
    */
   async getAllUsers(): Promise<User[]> {
     return this.userRepository.find();
+  }
+
+  /**
+   * Get a user by username and chat ID
+   */
+  async getUserByUsernameAndChat(username: string, chatId: number): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { username, chatId },
+    });
+  }
+
+  /**
+   * Check if a user is off on a specific date
+   */
+  private async isUserOffOnDate(userId: number, chatId: number, date: Date): Promise<boolean> {
+    const offCount = await this.offRepository.createQueryBuilder('off')
+      .where('off.userId = :userId', { userId })
+      .andWhere('off.chatId = :chatId', { chatId })
+      .andWhere('off.from <= :date', { date })
+      .andWhere('off.to >= :date', { date })
+      .getCount();
+    
+    return offCount > 0;
   }
 } 

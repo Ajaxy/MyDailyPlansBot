@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import * as path from 'path';
 import { env } from './dotenv';
-import { Plan, ReminderState, Repository, User } from '../entities';
+import { Plan, ReminderState, Repository, User, Off } from '../entities';
 
 // Import pg to define custom type parser for bigint
 import { types } from 'pg';
@@ -29,6 +29,7 @@ export const AppDataSource = new DataSource({
     Plan,
     ReminderState,
     Repository,
+    Off,
   ],
   migrations: [path.join(__dirname, '../migrations/**/*.ts')],
   subscribers: [],

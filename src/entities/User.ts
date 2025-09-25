@@ -1,9 +1,13 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, PrimaryGeneratedColumn, Unique } from 'typeorm';
 
 @Entity('users')
 @Index(['chatId']) // Add index for chatId for better query performance
+@Unique(['telegramId', 'chatId']) // Ensure unique combination of telegramId and chatId
 export class User {
-  @PrimaryColumn({ type: 'bigint', name: 'telegram_id' })
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'bigint', name: 'telegram_id' })
   telegramId!: number;
 
   @Column({ type: 'bigint', name: 'chat_id' })
