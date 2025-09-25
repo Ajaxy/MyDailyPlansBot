@@ -5,6 +5,7 @@ import {
   User,
   Plan,
   ReminderState,
+  Repository,
 } from '../entities';
 
 // Import pg to define custom type parser for bigint
@@ -32,6 +33,7 @@ export const AppDataSource = new DataSource({
     User,
     Plan,
     ReminderState,
+    Repository,
   ],
   migrations: [path.join(__dirname, '../migrations/**/*.ts')],
   subscribers: [],

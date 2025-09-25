@@ -15,11 +15,15 @@ export class User {
   @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive: boolean = true;
 
+  @Column({ type: 'varchar', length: 255, name: 'github_username', nullable: true })
+  githubUsername?: string;
+
   constructor(
     telegramId?: number,
     chatId?: number,
     username?: string,
-    isActive?: boolean
+    isActive?: boolean,
+    githubUsername?: string
   ) {
     if (telegramId !== undefined) {
       this.telegramId = telegramId;
@@ -32,6 +36,9 @@ export class User {
     }
     if (isActive !== undefined) {
       this.isActive = isActive;
+    }
+    if (githubUsername !== undefined) {
+      this.githubUsername = githubUsername;
     }
   }
 } 

@@ -40,6 +40,7 @@ export class BotService {
           '\n\nБуду напоминать рассказывать о планах на день: в рабочие дни в 6:00 GMT, с несколькими повторениями до 15:00 GMT.' +
           '\n\n*Команды:*' +
           '\n/status - Проверить статус ответов' +
+          '\n/remind_pr - Отправить напоминания о PR' +
           '\n/help - Показать справку',
           { parse_mode: 'Markdown' }
         );
@@ -91,6 +92,29 @@ export class BotService {
       }
     });
 
+    // Handle /remind_pr command to manually trigger PR reminders
+    this.bot.command('remind_pr', async (ctx) => {
+      if (ctx.chat.type === 'private') {
+        await ctx.reply('Эта команда работает только в групповых чатах.');
+        return;
+      }
+
+      const chatId = ctx.chat.id;
+
+      try {
+        await ctx.reply('🔄 Проверяю PR для этого чата...');
+        
+        // Send PR reminder only for this specific chat
+        const prReminderService = this.scheduler.getPrReminderService();
+        await prReminderService.sendPrReminderToChat(chatId);
+        
+        // Note: Success/no PRs message will be sent by the PR reminder service itself
+      } catch (error) {
+        console.error('Error sending PR reminders:', error);
+        await ctx.reply('❌ Ошибка при отправке напоминаний о PR.');
+      }
+    });
+
     // Handle /help command
     this.bot.command('help', async (ctx) => {
       const helpMessage = `
@@ -105,6 +129,7 @@ export class BotService {
 
 *Команды:*
 /status - Проверить, кто ответил сегодня
+/remind_pr - Отправить напоминания о PR вручную
 /help - Показать эту справку
 
 *Настройка:*
@@ -246,5 +271,12 @@ export class BotService {
       console.log('Triggering follow-up reminder');
       await scheduler.sendFollowUpReminder();
     }
+  }
+
+  // For manual PR reminder triggering in development
+  public async triggerPrReminder(): Promise<void> {
+    console.log('Manually triggering PR reminders...');
+    const scheduler = this.getScheduler();
+    await scheduler.sendPrReminders();
   }
 } 

@@ -9,6 +9,12 @@ A Telegram bot designed to help teams stay synchronized with daily plans. The bo
 - **Follow-up Reminders**: 9:00 AM, 12:00 PM, and 3:00 PM GMT (up to 4 total reminders per day)
 - **Smart Tracking**: Only sends follow-up reminders if not everyone has responded
 
+### 🔔 GitHub PR Reminders
+- **Automatic PR Checks**: 10:00 AM and 4:00 PM GMT daily
+- **Personalized Reminders**: Lists open PRs assigned to each team member
+- **Direct Links**: Clickable PR links for easy access
+- **Multi-repo Support**: Monitors multiple GitHub repositories
+
 ### 📊 User Management
 - **Database-driven**: User tracking managed through PostgreSQL
 - **Per-chat Configuration**: Users tracked separately for each chat
@@ -17,6 +23,7 @@ A Telegram bot designed to help teams stay synchronized with daily plans. The bo
 
 ### 💬 Bot Commands
 - `/status` - Check who has replied today and reminder count
+- `/remind_pr` - Manually trigger PR reminders for the current chat
 - `/help` - Show command help
 
 ### 🎯 Smart Response Detection
@@ -94,14 +101,36 @@ CREATE TABLE users (
   telegram_id BIGINT PRIMARY KEY,
   chat_id BIGINT NOT NULL,
   username VARCHAR(255) NOT NULL,
-  is_active BOOLEAN DEFAULT TRUE
+  is_active BOOLEAN DEFAULT TRUE,
+  github_username VARCHAR(255)
+);
+
+CREATE TABLE repositories (
+  id SERIAL PRIMARY KEY,
+  chat_id BIGINT NOT NULL,
+  full_name VARCHAR(255) NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  gh_token TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(full_name, chat_id)
 );
 ```
 
+### Users table:
 - **telegram_id**: User's Telegram ID (stored as number)
 - **chat_id**: Chat where the user should be tracked (stored as number)  
 - **username**: User's Telegram username (required)
 - **is_active**: Whether the user is currently being tracked
+- **github_username**: User's GitHub username for PR reminders (optional)
+
+### Repositories table:
+- **id**: Auto-incrementing primary key
+- **chat_id**: Chat where PR reminders for this repository should be sent
+- **full_name**: Repository full name in "owner/repo" format
+- **is_active**: Whether to check this repository for PRs
+- **gh_token**: Fine-grained personal access token for this repository (required)
+- **created_at**: When the repository was added
+- **Unique constraint**: Combination of full_name and chat_id (prevents duplicate entries)
 
 ## User Management
 
@@ -127,6 +156,47 @@ SELECT * FROM users WHERE is_active = true;
 
 **Important**: Only users with Telegram usernames can be tracked by the bot.
 
+## GitHub PR Reminders Configuration
+
+### 1. Configure Repositories with Tokens
+Each repository must have its own GitHub Personal Access Token. Add repositories to the `repositories` table:
+```sql
+-- Add repositories with GitHub tokens (required)
+INSERT INTO repositories (full_name, chat_id, is_active, gh_token) VALUES 
+  ('organization/repo1', -1001234567890, true, 'github_pat_...'),
+  ('organization/repo2', -1001234567890, true, 'github_pat_...');
+
+-- Use fine-grained personal access tokens with read-only access to PRs
+INSERT INTO repositories (full_name, chat_id, is_active, gh_token) VALUES 
+  ('private-org/sensitive-repo', -1001234567890, true, 'github_pat_...');
+
+-- List repositories for a chat
+SELECT * FROM repositories WHERE chat_id = -1001234567890 AND is_active = true;
+
+-- Update repository token
+UPDATE repositories SET gh_token = 'github_pat_...' WHERE id = 1;
+
+-- Disable a repository by ID
+UPDATE repositories SET is_active = false WHERE id = 1;
+```
+
+### 2. Creating GitHub Fine-grained Personal Access Tokens
+
+For each repository, create a fine-grained personal access token:
+1. Go to GitHub Settings > Developer settings > Personal access tokens > Fine-grained tokens
+2. Click "Generate new token"
+3. Set expiration date
+4. Select "Repository access" > "Selected repositories" and choose the specific repository
+5. Under "Repository permissions", set "Pull requests" to "Read"
+6. Generate and copy the token (starts with `github_pat_`)
+
+### 3. Add GitHub Usernames
+Update users with their GitHub usernames:
+```sql
+UPDATE users SET github_username = 'github-username' 
+WHERE telegram_id = 123456789;
+```
+
 ## Development
 
 ### Manual Testing
@@ -134,6 +204,7 @@ In development mode, manually trigger reminders:
 ```bash
 remind      # Follow-up reminder
 remind 6    # Initial reminder (6 AM type)
+remind_pr   # Trigger PR reminders
 ```
 
 ### Database Management

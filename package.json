@@ -5,6 +5,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/worker/index.js",
+    "bs": "npm run build && npm run start",
     "lint": "eslint --ext .ts src/",
     "dev": "nodemon --exec ts-node --transpile-only src/worker/index.ts",
     "test": "jest",

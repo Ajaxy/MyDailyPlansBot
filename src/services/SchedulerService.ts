@@ -3,6 +3,9 @@ import { Bot } from 'grammy';
 import { UserService } from './UserService';
 import { PlanService } from './PlanService';
 import { ReminderService } from './ReminderService';
+import { GitHubService } from './GitHubService';
+import { PrReminderService } from './PrReminderService';
+import { RepositoryService } from './RepositoryService';
 import { REMINDER_SCHEDULE, WORKING_DAYS } from '../types';
 import { User } from '../entities';
 
@@ -11,12 +14,18 @@ export class SchedulerService {
   private reminderService: ReminderService;
   private bot: Bot;
   private userService: UserService;
+  private prReminderService: PrReminderService;
 
   constructor(bot: Bot, planService: PlanService, reminderService: ReminderService, userService: UserService) {
     this.bot = bot;
     this.planService = planService;
     this.reminderService = reminderService;
     this.userService = userService;
+    
+    // Initialize GitHub and PR reminder services
+    const repositoryService = new RepositoryService();
+    const githubService = new GitHubService(repositoryService);
+    this.prReminderService = new PrReminderService(bot, githubService, userService);
   }
 
   public start(): void {
@@ -34,7 +43,15 @@ export class SchedulerService {
       timezone: 'GMT'
     });
 
+    // PR reminders at 10:00 and 16:00 GMT every day
+    cron.schedule('0 10,16 * * *', async () => {
+      await this.sendPrReminders();
+    }, {
+      timezone: 'GMT'
+    });
+
     console.log('Daily plan reminder scheduler started');
+    console.log('PR reminder scheduler started (10:00 and 16:00 GMT)');
   }
 
   private getCurrentDate(): string {
@@ -138,5 +155,24 @@ export class SchedulerService {
   // For testing/manual triggering
   public async getActiveChatIds(): Promise<number[]> {
     return this.userService.getActiveChatIds();
+  }
+
+  /**
+   * Send PR reminders to all active chats
+   */
+  public async sendPrReminders(): Promise<void> {
+    console.log('Sending PR reminders...');
+    try {
+      await this.prReminderService.sendPrReminders();
+    } catch (error) {
+      console.error('Error sending PR reminders:', error);
+    }
+  }
+
+  /**
+   * Get PR reminder service instance
+   */
+  public getPrReminderService(): PrReminderService {
+    return this.prReminderService;
   }
 } 

@@ -2,4 +2,7 @@ export { UserService } from './UserService';
 export { BotService } from './BotService';
 export { SchedulerService } from './SchedulerService';
 export { PlanService } from './PlanService';
-export { ReminderService } from './ReminderService'; 
+export { ReminderService } from './ReminderService';
+export { GitHubService } from './GitHubService';
+export { PrReminderService } from './PrReminderService';
+export { RepositoryService } from './RepositoryService'; 
