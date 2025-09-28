@@ -128,6 +128,18 @@ export class UserService {
   }
 
   /**
+   * Get all users for a specific chat (including inactive users)
+   * This is useful for duty reminders where we want to notify even inactive users
+   */
+  async getAllUsersForChat(chatId: number): Promise<User[]> {
+    return this.userRepository.find({
+      where: {
+        chatId,
+      },
+    });
+  }
+
+  /**
    * Get a user by username and chat ID
    */
   async getUserByUsernameAndChat(username: string, chatId: number): Promise<User | null> {

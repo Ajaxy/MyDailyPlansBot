@@ -69,8 +69,9 @@ export class DutyReminderService {
       }
 
       // Find user with matching Notion username in this chat
-      const activeUsers = await this.userService.getActiveUsersForChat(chatId);
-      const dutyUser = activeUsers.find((user: User) =>
+      // Include all users (active and inactive) for duty reminders
+      const allUsers = await this.userService.getAllUsersForChat(chatId);
+      const dutyUser = allUsers.find((user: User) =>
         user.notionUsername && user.notionUsername.toLowerCase() === duty.person.toLowerCase(),
       );
 
