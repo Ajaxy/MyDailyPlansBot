@@ -20,7 +20,7 @@ export class PrReminderService {
   /**
    * Send PR reminders to all active chats
    * Only sends reminders to chats that have:
-   * 1. Users with GitHub usernames configured
+   * 1. Users with GitHub usernames configured (including inactive users)
    * 2. Repositories with GitHub tokens configured for that chat
    * 3. Open PRs assigned to those users
    */
@@ -41,9 +41,9 @@ export class PrReminderService {
    */
   public async sendPrReminderToChat(chatId: number): Promise<void> {
     try {
-      // Get all active users with GitHub usernames in this chat
-      const activeUsers = await this.userService.getActiveUsersForChat(chatId);
-      const usersWithGitHub = activeUsers.filter((user: User) => user.githubUsername);
+      // Get all users with GitHub usernames in this chat (including inactive users)
+      const allUsers = await this.userService.getAllUsersForChat(chatId);
+      const usersWithGitHub = allUsers.filter((user: User) => user.githubUsername);
 
       if (usersWithGitHub.length === 0) {
         logger.info(`No users with GitHub usernames in chat ${chatId}, skipping PR reminder`);
