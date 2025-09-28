@@ -48,6 +48,17 @@ jest.mock('../src/services/ReminderService', () => {
   };
 });
 
+// Mock DutyReminderService
+const mockDutyReminderService = {
+  sendDutyReminders: jest.fn(),
+};
+
+jest.mock('../src/services/DutyReminderService', () => {
+  return {
+    DutyReminderService: jest.fn().mockImplementation(() => mockDutyReminderService),
+  };
+});
+
 // Mock the grammy Bot class
 const mockBot = {
   api: {
@@ -65,14 +76,14 @@ describe('SchedulerService', () => {
     const cron = require('node-cron');
     mockSchedule = cron.schedule;
     
-    scheduler = new SchedulerService(mockBot as any, mockPlanService as any, mockReminderService as any, mockUserService as any);
+    scheduler = new SchedulerService(mockBot as any, mockPlanService as any, mockReminderService as any, mockUserService as any, mockDutyReminderService as any);
   });
 
   describe('scheduler start', () => {
     it('should set up cron jobs', () => {
       scheduler.start();
       
-      expect(mockSchedule).toHaveBeenCalledTimes(2);
+      expect(mockSchedule).toHaveBeenCalledTimes(4);
       
       // Check initial reminder (6 AM on weekdays)
       expect(mockSchedule).toHaveBeenCalledWith(
@@ -84,6 +95,20 @@ describe('SchedulerService', () => {
       // Check follow-up reminders (9 AM, 12 PM, 3 PM on weekdays)
       expect(mockSchedule).toHaveBeenCalledWith(
         '0 9,12,15 * * 1-5',
+        expect.any(Function),
+        { timezone: 'GMT' }
+      );
+      
+      // Check PR reminders (10 AM and 4 PM on weekdays)
+      expect(mockSchedule).toHaveBeenCalledWith(
+        '0 10,16 * * 1-5',
+        expect.any(Function),
+        { timezone: 'GMT' }
+      );
+      
+      // Check duty reminders (12 AM daily)
+      expect(mockSchedule).toHaveBeenCalledWith(
+        '0 0 * * *',
         expect.any(Function),
         { timezone: 'GMT' }
       );
@@ -136,7 +161,7 @@ describe('SchedulerService', () => {
       // Mock services
       mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
       mockReminderService.getReminderCount.mockResolvedValue(0);
-      mockReminderService.resetReminderState.mockResolvedValue();
+      mockReminderService.resetReminderState.mockResolvedValue(undefined);
       mockReminderService.incrementReminderCount.mockResolvedValue(1);
       
       scheduler.start();
@@ -153,7 +178,6 @@ describe('SchedulerService', () => {
 
     it('should not send follow-up reminder if everyone has replied', async () => {
       const chatId = -123456789;
-      const today = '2023-12-15';
       const trackedUserIds = [123456789, 987654321];
       
       // Mock services
@@ -204,7 +228,7 @@ describe('SchedulerService', () => {
 
       expect(mockBot.api.sendMessage).toHaveBeenCalledWith(
         chatId,
-        '⏰ Дружеское напоминание: @jane_doe, пожалуйста, не забудьте поделиться своими планами на день!',
+        '⏰ Дружеское напоминание: @jane\\_doe, пожалуйста, не забудьте поделиться своими планами на день!',
         { parse_mode: 'Markdown' }
       );
 
@@ -214,7 +238,6 @@ describe('SchedulerService', () => {
 
     it('should handle user mention when user not found in database', async () => {
       const chatId = -123456789;
-      const today = '2023-12-15';
       const trackedUserIds = [123456789, 987654321];
       const unrepliedUserIds = [987654321];
       
@@ -244,7 +267,6 @@ describe('SchedulerService', () => {
 
     it('should not send more than 4 reminders per day', async () => {
       const chatId = -123456789;
-      const today = '2023-12-15';
       
       // Mock services
       mockUserService.getActiveChatIds.mockResolvedValue([chatId]);
@@ -287,7 +309,7 @@ describe('SchedulerService', () => {
       await initialReminderFunc();
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        `Error sending initial reminder to chat ${chatId}:`,
+        expect.stringContaining(`[ERROR] Error sending initial reminder to chat ${chatId}:`),
         expect.any(Error)
       );
       
@@ -335,7 +357,7 @@ describe('SchedulerService', () => {
       await initialReminderFunc();
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Error getting active chat IDs:',
+        expect.stringContaining('[ERROR] Error getting active chat IDs:'),
         expect.any(Error)
       );
       

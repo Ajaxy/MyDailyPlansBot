@@ -1,5 +1,5 @@
 import { BotService } from '../src/services/BotService';
-import { MockUpdate } from '../src/types';
+// import { MockUpdate } from '../src/types';
 
 // Mock the Bot
 const mockBot = {

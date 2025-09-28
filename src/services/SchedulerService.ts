@@ -52,8 +52,8 @@ export class SchedulerService {
       timezone: 'GMT',
     });
 
-    // PR reminders at 10:00 and 16:00 GMT every day
-    cron.schedule('0 10,16 * * *', async () => {
+    // PR reminders at 10:00 and 16:00 GMT on working days
+    cron.schedule('0 10,16 * * 1-5', async () => {
       await this.sendPrReminders();
     }, {
       timezone: 'GMT',
@@ -67,7 +67,7 @@ export class SchedulerService {
     });
 
     logger.info('Daily plan reminder scheduler started');
-    logger.info('PR reminder scheduler started (10:00 and 16:00 GMT)');
+    logger.info('PR reminder scheduler started (10:00 and 16:00 GMT on working days)');
     logger.info('Duty reminder scheduler started (12:00 AM GMT daily)');
   }
 

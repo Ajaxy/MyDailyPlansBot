@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+// import { DataSource } from 'typeorm';
 import { ReminderService } from '../src/services/ReminderService';
 import { ReminderState } from '../src/entities';
 
