@@ -38,6 +38,7 @@ export class GitHubService {
 
   /**
    * Get PRs assigned to specific GitHub usernames for a specific chat
+   * PRs with [Paused] in the title are excluded from reminders
    */
   public async getAssignedPrs(githubUsernames: string[], chatId: number): Promise<Map<string, UserPrs>> {
     const prsByUser = new Map<string, UserPrs>();
@@ -60,6 +61,12 @@ export class GitHubService {
       const allPrs = await this.fetchOpenPrs(chatId);
 
       for (const pr of allPrs) {
+        // Skip PRs with [Paused] in the title
+        if (pr.title.includes('[Paused]')) {
+          logger.info(`Skipping paused PR #${pr.number}: ${pr.title}`);
+          continue;
+        }
+
         // Extract repo name from the PR's base repository
         // The repo info is in pr.base.repo.full_name (format: "owner/repo")
         const repoName = pr.base?.repo?.full_name || 'unknown';
