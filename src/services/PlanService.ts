@@ -67,7 +67,7 @@ export class PlanService {
         },
       });
 
-      return plan !== undefined;
+      return Boolean(plan);
     } catch (error) {
       logger.error('Error checking if user replied:', error);
       throw error;
