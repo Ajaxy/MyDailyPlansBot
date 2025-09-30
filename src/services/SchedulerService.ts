@@ -71,11 +71,11 @@ export class SchedulerService {
     logger.info('Duty reminder scheduler started (12:00 AM GMT daily)');
   }
 
-  public async sendInitialReminder(): Promise<void> {
+  public async sendInitialReminder(chatId?: number): Promise<void> {
     const date = this.getCurrentDate();
 
     try {
-      const activeChatIds = await this.userService.getActiveChatIds();
+      const activeChatIds = chatId ? [chatId] : await this.userService.getActiveChatIds();
 
       for (const chatId of activeChatIds) {
         try {
@@ -100,11 +100,11 @@ export class SchedulerService {
     }
   }
 
-  public async sendFollowUpReminder(): Promise<void> {
+  public async sendFollowUpReminder(chatId?: number): Promise<void> {
     const date = this.getCurrentDate();
 
     try {
-      const activeChatIds = await this.userService.getActiveChatIds();
+      const activeChatIds = chatId ? [chatId] : await this.userService.getActiveChatIds();
 
       for (const chatId of activeChatIds) {
         try {

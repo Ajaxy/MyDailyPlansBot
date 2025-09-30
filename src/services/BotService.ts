@@ -84,7 +84,7 @@ export class BotService {
   }
 
   // For manual reminder triggering in development
-  public async triggerReminder(hour?: number): Promise<void> {
+  public async triggerReminder(hour?: number, chatId?: number): Promise<void> {
     logger.info('Manually triggering reminders...');
     const scheduler = this.getScheduler();
 
@@ -94,11 +94,11 @@ export class BotService {
     if (targetHour === 6) {
       // Trigger initial reminder
       logger.info('Triggering initial reminder (6 AM type)');
-      await scheduler.sendInitialReminder();
+      await scheduler.sendInitialReminder(chatId);
     } else {
       // Trigger follow-up reminder
       logger.info('Triggering follow-up reminder');
-      await scheduler.sendFollowUpReminder();
+      await scheduler.sendFollowUpReminder(chatId);
     }
   }
 
@@ -179,6 +179,26 @@ export class BotService {
       } catch (error) {
         logger.error('Error getting status:', error);
         await ctx.reply('❌ Ошибка при получении статуса.');
+      }
+    });
+
+    // Handle /remind command to manually trigger plan reminders
+    this.bot.command('remind', async (ctx) => {
+      if (ctx.chat.type === 'private') {
+        await ctx.reply('Эта команда работает только в групповых чатах.');
+        return;
+      }
+
+      const chatId = ctx.chat.id;
+
+      try {
+        logger.info(`Triggering manual reminder...`);
+        this.triggerReminder(undefined, chatId).catch((error) => {
+          logger.error('Error triggering reminder:', error);
+        });
+      } catch (error) {
+        logger.error('Error sending plan reminders:', error);
+        await ctx.reply('❌ Ошибка при отправке напоминаний о планах.');
       }
     });
 
