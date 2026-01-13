@@ -12,13 +12,13 @@ interface DutyAssignment {
   person: string;
 }
 
-const NOTION_PAGE_URL = 'https://www.notion.so/anywaylabs/2025-168ba64b3014802fb8cdf262d3fee85e';
+const NOTION_PAGE_URL = 'https://www.notion.so/anywaylabs/Duty-calendar-2026-2e0ba64b301480acbeeeda45196b5476';
 
 export class DutyReminderService {
   private bot: Bot;
   private userService: UserService;
   private notion: Client;
-  private readonly PAGE_ID = '168ba64b3014802fb8cdf262d3fee85e';
+  private readonly PAGE_ID = '2e0ba64b301480acbeeeda45196b5476';
   private readonly DUTY_CHAT_ID = -1001783045675;
 
   constructor(bot: Bot, userService: UserService) {
@@ -108,9 +108,11 @@ export class DutyReminderService {
 
       // Get all blocks from the page
       const blocks = await this.getPageBlocks(this.PAGE_ID);
+      logger.info(`Found ${blocks.length} blocks on the Notion page`);
 
       // Find table blocks
       const tableBlocks = blocks.filter((block: any) => block.type === 'table');
+      logger.info(`Found ${tableBlocks.length} table(s) on the page`);
 
       if (tableBlocks.length === 0) {
         logger.info('No table found on the Notion page');
@@ -118,8 +120,9 @@ export class DutyReminderService {
       }
 
       // Process each table to find today's duty
-      for (const table of tableBlocks) {
-        logger.info(`Processing table block: ${table.id}`);
+      for (let i = 0; i < tableBlocks.length; i++) {
+        const table = tableBlocks[i];
+        logger.info(`Processing table ${i + 1}/${tableBlocks.length} (ID: ${table.id})`);
         const dutyAssignment = await this.parseTableForDuty(table.id);
         if (dutyAssignment) {
           return dutyAssignment;
@@ -168,8 +171,24 @@ export class DutyReminderService {
         return undefined;
       }
 
+      // Check if this is the duty table by examining the header
+      if (tableRows.length > 0) {
+        const headerRow = tableRows[0];
+        const headerCells = headerRow.table_row?.cells || [];
+
+        if (headerCells.length >= 3) {
+          const firstColumnHeader = this.extractTextFromCell(headerCells[0]).toLowerCase();
+
+          // Skip this table if it doesn't have "date" in the first column header
+          if (!firstColumnHeader.includes('date') && !firstColumnHeader.includes('дата')) {
+            logger.info(`Skipping table - first column header is "${firstColumnHeader}", not a date column`);
+            return undefined;
+          }
+        }
+      }
+
       const todayDate = this.getTodayDate();
-      logger.info(`Looking for duty assignment for date: ${todayDate}`);
+      logger.info(`Looking for duty assignment for date: ${todayDate} in table ${tableId}`);
 
       // Check each row for today's date
       for (let i = 0; i < tableRows.length; i++) {
