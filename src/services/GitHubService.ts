@@ -19,6 +19,10 @@ interface GitHubPr {
   }>;
 }
 
+interface GitHubPrWithRepo extends GitHubPr {
+  hideRepoName: boolean;
+}
+
 interface UserPrs {
   githubUsername: string;
   prs: Array<{
@@ -26,6 +30,7 @@ interface UserPrs {
     title: string;
     url: string;
     repo: string;
+    hideRepoName: boolean;
   }>;
 }
 
@@ -84,6 +89,7 @@ export class GitHubService {
               title: pr.title,
               url: pr.html_url,
               repo: repoName,
+              hideRepoName: pr.hideRepoName,
             });
           }
         }
@@ -98,8 +104,8 @@ export class GitHubService {
   /**
    * Fetch all open PRs from repositories configured for a specific chat
    */
-  private async fetchOpenPrs(chatId: number): Promise<GitHubPr[]> {
-    const allPrs: GitHubPr[] = [];
+  private async fetchOpenPrs(chatId: number): Promise<GitHubPrWithRepo[]> {
+    const allPrs: GitHubPrWithRepo[] = [];
 
     const repositories = await this.repositoryService.getActiveRepositoriesForChat(chatId);
 
@@ -130,7 +136,12 @@ export class GitHubService {
         }
 
         const prs = await response.json() as GitHubPr[];
-        allPrs.push(...prs);
+        for (const pr of prs) {
+          allPrs.push({
+            ...pr,
+            hideRepoName: repo.hideRepoName === true,
+          });
+        }
       } catch (error) {
         logger.error(`Error fetching PRs from ${repo.fullName}:`, error);
       }

@@ -79,7 +79,7 @@ export class PrReminderService {
     users: User[],
     prsByUser: Map<string, {
       githubUsername: string;
-      prs: Array<{ number: number; title: string; url: string; repo: string }>;
+      prs: Array<{ number: number; title: string; url: string; repo: string; hideRepoName: boolean }>;
     }>,
   ): string | undefined {
     const userMessages: string[] = [];
@@ -95,7 +95,8 @@ export class PrReminderService {
           // Escape HTML characters in PR title
           const escapedTitle = this.escapeHtml(pr.title);
           const prLink = `<a href="${pr.url}">#${pr.number}</a>`;
-          userMessage += `\n• ${prLink} - ${escapedTitle} (${pr.repo})`;
+          const repoSuffix = pr.hideRepoName ? '' : ` (${pr.repo})`;
+          userMessage += `\n• ${prLink} - ${escapedTitle}${repoSuffix}`;
         }
 
         userMessages.push(userMessage);
