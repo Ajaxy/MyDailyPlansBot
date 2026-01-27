@@ -115,6 +115,7 @@ CREATE TABLE repositories (
   chat_id BIGINT NOT NULL,
   full_name VARCHAR(255) NOT NULL,
   is_active BOOLEAN DEFAULT TRUE,
+  hide_repo_name BOOLEAN DEFAULT FALSE,
   gh_token TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(full_name, chat_id)
@@ -133,6 +134,7 @@ CREATE TABLE repositories (
 - **chat_id**: Chat where PR reminders for this repository should be sent
 - **full_name**: Repository full name in "owner/repo" format
 - **is_active**: Whether to check this repository for PRs
+- **hide_repo_name**: Whether to hide the repo name in PR reminders
 - **gh_token**: Fine-grained personal access token for this repository (required)
 - **created_at**: When the repository was added
 - **Unique constraint**: Combination of full_name and chat_id (prevents duplicate entries)

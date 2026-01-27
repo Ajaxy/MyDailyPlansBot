@@ -16,13 +16,16 @@ export class Repository {
   @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive: boolean = true;
 
+  @Column({ type: 'boolean', default: false, name: 'hide_repo_name' })
+  hideRepoName: boolean = false;
+
   @Column({ type: 'text', name: 'gh_token', nullable: true })
   ghToken?: string;
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', name: 'created_at' })
   createdAt!: Date;
 
-  constructor(chatId?: number, fullName?: string, isActive?: boolean) {
+  constructor(chatId?: number, fullName?: string, isActive?: boolean, hideRepoName?: boolean) {
     if (chatId !== undefined) {
       this.chatId = chatId;
     }
@@ -31,6 +34,9 @@ export class Repository {
     }
     if (isActive !== undefined) {
       this.isActive = isActive;
+    }
+    if (hideRepoName !== undefined) {
+      this.hideRepoName = hideRepoName;
     }
   }
 }
