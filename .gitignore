@@ -3,4 +3,5 @@ dist
 .localStorage*
 media/
 !media/.keep
+node_modules/
 
